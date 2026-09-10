@@ -28,6 +28,9 @@ public class HotelInventory implements Inventory {
 
     private final Map<String, TreeSet<RoomBookingHold>> holdsByRoomId;
 
+    // NEW: Global hold ID -> hold
+    private final Map<String, RoomBookingHold> holdsById;
+
     // ============================================================
     // HOLD EXPIRATION
     // ============================================================
@@ -60,6 +63,9 @@ public class HotelInventory implements Inventory {
 
         this.bookingsByRoomId = new HashMap<>();
         this.holdsByRoomId = new HashMap<>();
+
+        // NEW
+        this.holdsById = new HashMap<>();
 
         this.pendingHolds = new PriorityQueue<>(
                 Comparator.comparingLong(RoomBookingHold::expireAt)
@@ -504,6 +510,13 @@ public class HotelInventory implements Inventory {
 
             removeExpiredHoldsInternal();
 
+            // NEW: holdId must be globally unique
+            if (holdsById.containsKey(holdId)) {
+                throw new IllegalArgumentException(
+                        "Hold already exists: " + holdId
+                );
+            }
+
             Set<String> roomIds =
                     roomIdsByType.get(roomType);
 
@@ -541,6 +554,12 @@ public class HotelInventory implements Inventory {
                             checkOut,
                             expireAt
                     );
+
+            // NEW: global lookup
+            holdsById.put(
+                    holdId,
+                    hold
+            );
 
             holdsByRoomId
                     .get(availableRoomId)
@@ -584,6 +603,9 @@ public class HotelInventory implements Inventory {
                     holdsByRoomId.get(hold.roomId());
 
             holds.remove(hold);
+
+            // NEW
+            holdsById.remove(holdId);
 
             pendingHolds.remove(hold);
 
@@ -630,6 +652,9 @@ public class HotelInventory implements Inventory {
 
             holds.remove(hold);
 
+            // NEW
+            holdsById.remove(holdId);
+
             pendingHolds.remove(hold);
 
             return true;
@@ -647,18 +672,8 @@ public class HotelInventory implements Inventory {
             String holdId
     ) {
 
-        for (TreeSet<RoomBookingHold> holds
-                : holdsByRoomId.values()) {
-
-            for (RoomBookingHold hold : holds) {
-
-                if (hold.holdId().equals(holdId)) {
-                    return hold;
-                }
-            }
-        }
-
-        return null;
+        // NEW: O(1) lookup instead of scanning every room
+        return holdsById.get(holdId);
     }
 
     // ============================================================
@@ -686,6 +701,9 @@ public class HotelInventory implements Inventory {
             if (holds != null) {
                 holds.remove(hold);
             }
+
+            // NEW
+            holdsById.remove(hold.holdId());
         }
     }
 

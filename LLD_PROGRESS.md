@@ -36,10 +36,49 @@ Next session: Concurrent Seat/Inventory Reservation Service with lock expiry
   targeting G1 (re-test cold, no unlock), G10 (lock expiry/reaper).
 ```
 
+```
+SESSION 2 · Concurrent Hotel-Room Hold Reservation (UnitHoldingTemporary) · 2026-09-10
+Target gaps: G1 (retest cold), G10
+Score: 54/100 (partial — dims 1/5/9 not exercised) → Verdict: No Hire on aggregate,
+  but the actually-targeted dimension (6, Concurrency) went 3→8 and was
+  self-produced with zero unlocks. Aggregate is dragged down by dims 3/4/8/10,
+  which were out of scope this round, not regressed.
+Won:  G1 and G10 independently produced, no unlock, verified correct under a
+        real 5-thread race (exactly 2/2 available rooms won, 3/5 correctly
+        rejected) — first time a concurrency gap closed the same session it
+        was cold-assigned.
+      Independently re-fixed B1 (atomic check-and-commit under one lock) and
+        B2 (TreeSet comparator now tie-breaks on a unique id) from the
+        original 4-problem audit, unprompted, in a brand-new domain — direct
+        evidence the meta-gap (root cause #5, no cross-problem transfer) is
+        moving.
+Lost: holdId is never checked for uniqueness (HotelInventory.holdRoom), and
+        findHoldInternal returns a nondeterministic first match on collision
+        — a real correctness bug with a concrete break case.
+      confirmHold/cancelHold both do pendingHolds.remove(hold), an O(n) PQ
+        scan — the exact "stale entry, skip lazily via a version tag instead
+        of eager removal" lesson from KV_Store_TTL was not applied here.
+        Confirms the transfer isn't automatic yet; it has to be deliberately
+        checked for on every new problem.
+TRANSFERABLE RULE: A lesson learned via "unlock it" isn't transferred until
+  it's reproduced unprompted in a different problem — track each taught
+  concept (not just each gap id) across problems until it shows up on its own.
+RECALL CARD → Q: What specifically closes a gap in this ledger (vs. just
+  "improving")?
+  A: Solving it correctly, unprompted, in a DIFFERENT problem than the one
+  where it was taught/unlocked — which is what happened to G1 and G10 this
+  session.
+Next session: TBD — candidate: fix the holdId-uniqueness bug + the PQ lazy-
+  skip pattern in THIS codebase first (quick, closes the loop cleanly), or
+  move to a fresh problem (Rate Limiter / Bounded Blocking Queue) to test
+  whether the Condition/wait-signal mechanic itself (not just "add a lock")
+  transfers next.
+```
+
 | # | Date | Problem | Target gaps | Score | Verdict |
 |---|------|---------|-------------|-------|---------|
 | 1 | 2026-09-09 – 2026-09-10 | Thread-safe KV Store w/ TTL | G1, G15, G16, G12 | 50/100 (partial) | No Hire — assisted |
-| 2 | 2026-09-10 | Concurrent Seat/Inventory Reservation w/ lock expiry | G1, G10 | — | in progress |
+| 2 | 2026-09-10 | Concurrent Seat/Inventory Reservation w/ lock expiry | G1, G10 | 54/100 (partial) | No Hire on aggregate — but G1 target: Hire |
 
 ---
 
@@ -47,16 +86,16 @@ Next session: Concurrent Seat/Inventory Reservation Service with lock expiry
 
 | Dimension | S1 | S2 | S3 | S4 | S5 | S6 | S7 | S8 | S9 | S10 | S11 | S12 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 Requirements & scoping | — | | | | | | | | | | | |
-| 2 Domain modeling | 7 | | | | | | | | | | | |
-| 3 Abstraction & seams | 5 | | | | | | | | | | | |
-| 4 SOLID | 5 | | | | | | | | | | | |
-| 5 Pattern selection | — | | | | | | | | | | | |
-| 6 Concurrency & correctness | 3 | | | | | | | | | | | |
-| 7 Data structures & complexity | 8 | | | | | | | | | | | |
-| 8 API & error design | 4 | | | | | | | | | | | |
-| 9 Extensibility (proven) | — | | | | | | | | | | | |
-| 10 Testability & hygiene | 3 | | | | | | | | | | | |
+| 1 Requirements & scoping | — | — | | | | | | | | | | |
+| 2 Domain modeling | 7 | 8 | | | | | | | | | | |
+| 3 Abstraction & seams | 5 | 4 | | | | | | | | | | |
+| 4 SOLID | 5 | 5 | | | | | | | | | | |
+| 5 Pattern selection | — | — | | | | | | | | | | |
+| 6 Concurrency & correctness | 3 | 8 | | | | | | | | | | |
+| 7 Data structures & complexity | 8 | 6 | | | | | | | | | | |
+| 8 API & error design | 4 | 4 | | | | | | | | | | |
+| 9 Extensibility (proven) | — | — | | | | | | | | | | |
+| 10 Testability & hygiene | 3 | 3 | | | | | | | | | | |
 
 ---
 
@@ -67,8 +106,8 @@ Next session: Concurrent Seat/Inventory Reservation Service with lock expiry
 ### P0
 | ID | Gap | Status |
 |---|---|---|
-| G1 | Zero concurrency thinking (TOCTOU in `ShowSeat.lock()`) | improving (worked example in KV_Store_TTL; not yet independently reproduced — retest S2) |
-| G2 | No thread of execution / no simulation loop | improving (sweeper thread in KV_Store_TTL was unlocked, not self-produced) |
+| G1 | Zero concurrency thinking (TOCTOU in `ShowSeat.lock()`) | closed (S2: `HotelInventory` — atomic check-and-commit under one lock, verified correct under a real 5-thread race, no unlock used) |
+| G2 | No thread of execution / no simulation loop | closed (S2: `runHoldExpirationWorker` is a real, self-built daemon thread — releases the lock before sleeping, verified sweeping hold-3 within its TTL window) |
 | G3 | God controllers, no layering vocabulary | open |
 | G4 | No repository abstraction | open |
 | G5 | Presentation fused into domain (`System.out` in entities) | open |
@@ -80,7 +119,7 @@ Next session: Concurrent Seat/Inventory Reservation Service with lock expiry
 | G7 | Only 4 patterns ever used | open |
 | G8 | Business policy hardcoded in logic | open |
 | G9 | No events / no Observer | open |
-| G10 | No lock expiry / TTL / reaper | improving (KV_Store_TTL reaper was unlocked, not self-produced — retest S2) |
+| G10 | No lock expiry / TTL / reaper | closed (S2: hold expiry + background sweep self-built in `HotelInventory`, no unlock — closes the loop from the *original* Movie Ticket Booking gap where a `SEATS_LOCKED` booking never expired) |
 | G11 | Idempotency modeled but never used | open |
 | G12 | No custom domain exceptions | open |
 | G13 | Encapsulation leaks (live collections returned) | open |
@@ -91,8 +130,8 @@ Next session: Concurrent Seat/Inventory Reservation Service with lock expiry
 ### P2 — correctness bugs
 | ID | Bug | Status |
 |---|---|---|
-| B1 | Double-booking hole (Rental): check and commit not atomic | open |
-| B2 | `TreeSet` comparator defines equality (Rental) | open |
+| B1 | Double-booking hole (Rental): check and commit not atomic | closed (S2: `HotelInventory.holdRoom` wraps find-available + create-hold in one `lock`, verified by the 5-thread race) |
+| B2 | `TreeSet` comparator defines equality (Rental) | closed (S2: `holdsByRoomId`/`bookingsByRoomId` comparators end in `.thenComparing(...Id)`, a real tie-breaker) |
 | B3 | Return ≠ cancel (Rental) | open |
 | B4 | Entity as `HashMap` key without equals/hashCode (Airline) | open |
 | B5 | `TreeMap` used as a `HashMap` (Airline) | open |
@@ -150,3 +189,4 @@ _(one added per session; ★ = failed on re-test at least once)_
 | # | Q | A | Failed re-tests |
 |---|---|---|---|
 | 1 | Why can't you call `writeLock().lock()` while already holding `readLock()` on the same `ReentrantReadWriteLock`? | Not a supported upgrade — the write lock requires no readers hold the lock, so the holding thread blocks indefinitely. Release the read lock fully first, then re-check state from scratch since it wasn't held continuously. | |
+| 2 | What specifically moves a gap from `open`/`improving` to `closed` in this ledger? | Solved correctly, unprompted, in a DIFFERENT problem than the one where it was taught or unlocked — not just "worked once where I showed you." | |
