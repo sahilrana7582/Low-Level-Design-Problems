@@ -1,1 +1,40 @@
+# macOS
 .DS_Store
+**/.DS_Store
+
+# Java compiled files
+*.class
+
+# Maven
+target/
+**/target/
+
+# Gradle
+.gradle/
+**/.gradle/
+build/
+**/build/
+
+# IntelliJ IDEA
+.idea/
+**/.idea/
+*.iml
+**/*.iml
+
+# Eclipse
+.classpath
+.project
+.settings/
+**/.settings/
+
+# VS Code
+.vscode/
+**/.vscode/
+
+# Java logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*.swo

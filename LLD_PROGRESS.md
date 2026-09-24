@@ -7,6 +7,13 @@
 
 ## PARKED
 
+- **Student Management System (parked 2026-09-24 after S12, at 57/100 Level-1 lens — best 67 in S11).** Sahil asked for
+  another new problem. Level 1 is now unpassed on THREE problems in a row (Subscription 52, SMS 57, best 67; pass = 70).
+  Owed to cross 70, all small and concrete: make `Grade` immutable again (build a new one at `completeCourse`, no
+  setter, no aliasing across snapshots), wire `totalMarksObtained` through (his own demo prints 0 after passing 85),
+  decide whether a Grade belongs on a PROGRESSING enrollment at all, and the two raw `IllegalArgumentException`
+  spots. ~20-minute finish whenever he wants it. Recurring root cause across S10–S12: the breaking evidence was already
+  in his own console output (card 12).
 - **Library Management System (parked 2026-09-21 after S6, at 60/100, raw 66).** Sahil closed the build
   and moved on. He asked for an **end-of-day session (2026-09-21) to find "the absolutely best way to
   solve this LLD"** = Phase 7 for Library: reference design + `Decision | Mine | Yours | Why` diff table +
@@ -340,6 +347,136 @@ Next session: Bring the flows back and close the remaining Level-1 items (valida
   for Level 2, where the lesson is that weekly vs monthly differs only in DATA (how long a period lasts).
 ```
 
+```
+SESSION 9 · Subscription Billing — Level-1 REFERENCE solution (written by Sensei at his request) · 2026-09-21
+Score: NOT SCORED. Sahil was exhausted and asked for the fixed, best version to study and take notes from. His own
+  attempt stays at 52/100 (S8) and is untouched in problems/SubscriptionBilling (a redundant copy of it sits in
+  problems/SubscriptionBilling/_my-attempt-before-fix — Sensei-made, safe to delete). Overwriting/deleting his files was
+  blocked by the auto-mode classifier, so the reference lives in problems/SubscriptionBillingReference. No ledger gap is
+  credited: he has to reproduce it himself.
+What it is: the best LEVEL-1 (ONCE model) solution — deliberately no factories, no interfaces, no concurrency, no recurring,
+  no JUnit. Verified: a self-checking Main (8 sections, 28 checks, movable Clock) and 21 extra edge probes all pass.
+Rules it demonstrates (his notes checklist): immutable Plan record (snapshot for free) · store facts, derive state from the
+  clock · one structure per fact (single history list, current = last live entry) · take ids across the boundary and resolve
+  inside · one failure convention (Optional for "maybe", domain exceptions for failures, no printing in the service) ·
+  variation as data (BillingPeriod enum carries the period length) · inject the Clock · return copies · a demo that verifies.
+TRANSFERABLE RULE: Store facts, derive states — keep only what happened (started, cancelled) and compute trial/active/expired
+  from the clock, so two sources of truth can never disagree.
+RECALL CARD → Q: Why derive "expired" from the clock instead of keeping a state flag on the subscription?
+  A: A stored flag only changes when someone touches the object, so it can say ACTIVE while the clock says expired. Store the
+  timestamps and compute the state from "now" — one source of truth.
+Next session: Closed-book rebuild — he rebuilds the ONCE model from his own notes (30–40 min), scored on the Level-1 bar
+  (pass = 70, every criterion ≥ 5). Then Level 2 (where abstraction earns its place). Library end-of-day session still parked.
+```
+
+```
+SESSION 10 · Student Management System (new problem, Level 1) · 2026-09-22
+Sahil chose to move to a new problem instead of the planned Subscription Billing closed-book rebuild — that rebuild
+  and the Library end-of-day session both stay parked. Ran the full Level-1 loop: Phase 0 recall, Phase 2 scoping
+  (graded his 4 questions, caught 2 misses — catalog-vs-instance for "course", verbs before nouns), Phase 3 design
+  (multi-round Socratic — TreeSet→Map self-correction, registration-scope correction, Grade sentinel flagged,
+  completedAt NPE trap caught before code), Phase 5 he implemented solo, Phase 6 scored.
+Score: 63/100 on the Level-1 lens (38/60: requirements 5, domain 8, responsibilities 8, data structures 5,
+  API & errors 7, code quality 5). Pass mark 70 with every criterion ≥ 5 → not yet, but first Level-1 attempt to
+  clear the ≥5 floor on every criterion (S7 had API&errors=4, S8 had API&errors=3 and code quality=4). Best
+  Level-1 score to date.
+Won:  Enrollment modeled as an immutable, append-only snapshot per status transition — genuine unprompted transfer
+        of last session's "store facts" lesson. getStudent/getCourse throw typed exceptions instead of returning
+        null — directly fixes the exact NPE-class bug from S8 (Subscription's canConsumeService). Duplicate
+        enrollment now throws instead of returning a UI string — resolved the open convention question correctly
+        in code. CourseService correctly moved TreeSet → Map<id,Course> after Phase-3 pushback. Defensive copies
+        on every list leaving a service (G13 held); zero System.out in the domain (G5 held, third clean data point).
+Lost: Standing/grades — the feature he scoped himself — is unreachable: no path ever creates a COMPLETED
+        enrollment or a real Grade; Grade.getPercentage() is dead code. Re-enrollment after a drop is silently
+        allowed (hasActiveEnrollment only checks the latest snapshot's status == PROGRESSING), directly
+        contradicting his own Phase-3 decision to block it. StudentService — built minutes after fixing Course's
+        List→Map problem — still uses List + O(n) scan with no duplicate-id guard: a same-session, same-problem
+        transfer failure, sharper than his usual cross-problem one. The promised two-map rollback ("ACID, whole
+        or not at all") was never written — invisible today only because ArrayList.add can't fail. Main is still
+        println-only; none of his 5 exception types are ever exercised in the demo, not even the capacity
+        boundary he set up himself (maxSeats=2, exactly 2 enrolled, no 3rd attempt).
+TRANSFERABLE RULE: A lesson learned for one class isn't applied until you check every sibling class doing the same
+  job — fixing Course's lookup and leaving Student's the same mistake, minutes later, is a checklist failure, not
+  a knowledge gap.
+RECALL CARD → Q: You fixed Course's lookup from a TreeSet to a Map<id, Course> earlier in the session. StudentService,
+  built minutes later, still uses a List + linear scan with no duplicate-id guard. What should you have done, and when?
+  A: The moment a data-structure lesson lands for one entity, check every other service doing the same id-keyed job —
+  it's a general rule, not a Course-specific one. Do it before writing the sibling class, not after review finds it.
+Next session: fix the 3 MAJORs (wire up a real completeCourse/Grade path, decide + enforce re-enrollment-after-drop
+  on purpose, fix StudentService's data structure + duplicate-id guard), re-score against the same Level-1 bar.
+  Subscription Billing closed-book rebuild and Library end-of-day session remain parked.
+```
+
+```
+SESSION 11 · Student Management System — Level-1 re-score · 2026-09-22
+Target: close the 3 S10 MAJORs.
+Score: 67/100 on the Level-1 lens (40/60: requirements 6, domain 8, responsibilities 6, data structures 9,
+  API & errors 6, code quality 5). Was 63 in S10. Pass mark 70 → not yet, but closing in.
+Won:  StudentService fully fixed — Map<id,Student>, O(1), duplicate-id guard (DuplicateStudentException). Clean,
+        complete resolution of S10's sharpest finding (B26). Re-enrollment policy explicitly decided and documented
+        (blocked on ANY history for a course, not just the latest snapshot — consistent with the locked "one
+        offering" scope) — closes B24.
+Lost: The headline gap survived the fix round: `completeCourse` now creates a real, Grade-bearing COMPLETED
+        enrollment, but `getStudentStanding` still filters for latest-status == PROGRESSING only, so a student's
+        actual grade stays invisible through the one method named for it. His own Main.java runs exactly this
+        sequence (completeCourse then getStudentStanding) and prints an empty list right under a recorded 85/100 —
+        he ran it and didn't catch it (B25 narrows, doesn't close). New regression: fixing "remove doesn't check
+        active enrollments" made CourseService.remove take an EnrollmentService parameter — the catalog now
+        depends on enrollment orchestration to do its job (B27, new). Exception convention regressed in two new
+        spots (addCourse, completeCourse both throw raw IllegalArgumentException instead of a named exception,
+        while he used named exceptions correctly elsewhere in the same round). getStanding still byte-identical
+        to getEnrolledStudents, now just commented as intentional rather than fixed. Main still println-only —
+        zero of 7 exception types ever exercised in the demo, no capacity boundary hit.
+TRANSFERABLE RULE: Building the write path for a feature (completeCourse) doesn't mean the read path (getStudentStanding)
+  automatically uses it — trace the fact all the way from where it's created to where it's displayed, especially
+  when your own demo prints the broken result right in front of you.
+RECALL CARD → Q: You added `completeCourse`, which creates a real Grade-bearing enrollment. Your own Main.java calls
+  it and then immediately calls getStudentStanding, and prints an empty list. What does that output tell you, and
+  why didn't code review catch it before I did?
+  A: A method's name is a promise about what it returns — "standing" implied grades, but the implementation only
+  ever looked at PROGRESSING status. Reading your own demo's output line-by-line against what you expected it to
+  say is exactly the habit that catches this before someone else has to.
+Next session: fix getStudentStanding to actually surface completed grades (decide what "standing" means, once,
+  and make the method match), move the remove-with-active-enrollments check to whoever should own it, fix the
+  two raw IllegalArgumentException spots. Subscription Billing rebuild and Library end-of-day session remain parked.
+```
+
+```
+SESSION 12 · Student Management System — Level-1 re-score (regression) · 2026-09-22
+Target: close S11's remaining MAJOR (getStudentStanding excludes grades) and B27 (CourseService/EnrollmentService
+  dependency inversion).
+Score: 57/100 on the Level-1 lens (34/60: requirements 6, domain 4, responsibilities 7, data structures 7,
+  API & errors 5, code quality 5). Was 67 in S11 — a real regression, his lowest score on this problem yet, despite
+  two genuine structural fixes landing correctly.
+Won:  B27 cleanly closed — `removeCourse` moved into EnrollmentService (checks active enrollments, then delegates to
+        a simplified single-arg CourseService.remove); dependency direction now correct. getStanding/getStudentStanding/
+        getStudentCourseStanding all reworked to take an explicit EnrollmentStatus parameter instead of hardcoding
+        PROGRESSING — the right shape of fix for S11's core MAJOR; the read path can now structurally surface
+        COMPLETED records. Main's demo widened from 1 flow to a 17-section walkthrough covering every status and
+        both courses.
+Lost: Two new defects, both visible in his own printed output, neither caught before asking for a re-score.
+        (1) completeCourse(studentId, courseId, totalMarksObtained) never uses totalMarksObtained — Grade.SetObtainerMark
+        is defined but called nowhere in the codebase (grepped to confirm) — so a completed course's grade is always
+        obtainedMarks=0 regardless of the score passed in; his own Main passes 85 and prints 0 four lines later.
+        (2) Grade regressed from a fully immutable value object to a mutable one (public setter, non-final field),
+        and the identical Grade instance is now carried by reference across every snapshot in an enrollment's history
+        (Progressing -> Dropped/Completed all alias the same object) — breaking the one property (immutable
+        append-only snapshots) that was this problem's standout win. Also: Grade now constructed with a hardcoded
+        totalMarks=100 and a hand-picked id offset (+299) at enrollment time, before any grading exists.
+TRANSFERABLE RULE: Fixing the bug you were shown doesn't verify itself — when the fix touches a new field, parameter,
+  or method, trace that exact new path end-to-end (call it, print it, read the number) before calling it fixed and
+  asking for a re-score. Three rounds running now where the breaking evidence was already sitting in his own console
+  output.
+RECALL CARD → Q: You reworked completeCourse to take a score and reworked the standing queries to surface COMPLETED
+  records — genuinely the right fix. Your own demo then prints obtainedMarks=0 right after passing 85. What single
+  habit would have caught this before asking for a re-score?
+  A: Read your own demo's printed output line by line against what you expected each line to say — not just that it
+  ran without throwing, but that the numbers in it are the numbers you put in.
+Next session: make Grade immutable again (construct a new one at completeCourse time instead of mutating), actually
+  wire the score through, decide whether Grade belongs on a PROGRESSING enrollment at all. Subscription Billing
+  rebuild and Library end-of-day session remain parked.
+```
+
 | # | Date | Problem | Target gaps | Score | Verdict |
 |---|------|---------|-------------|-------|---------|
 | 1 | 2026-09-09 – 2026-09-10 | Thread-safe KV Store w/ TTL | G1, G15, G16, G12 | 50/100 (partial) | No Hire — assisted |
@@ -350,6 +487,10 @@ Next session: Bring the flows back and close the remaining Level-1 items (valida
 | 6 | 2026-09-21 | Library Management System — fix round 2 (rescore) | B19, B20, B21 fixed; G16 not addressed | 60/100 (raw 66, capped — data race) | Lean Hire |
 | 7 | 2026-09-21 | Subscription Billing (ONCE model) — Level-1 lens | Level-1 bar (new); G15/G16 deferred | 60/100 (Level-1 lens, not comparable) | Not yet decent |
 | 8 | 2026-09-21 | Subscription Billing (ONCE model) — Level-1 re-score | Close Level 1; 4 regressions found | 52/100 (Level-1 lens) | Not yet decent |
+| 9 | 2026-09-21 | Subscription Billing — Level-1 reference (Sensei-written) | — | not scored | — |
+| 10 | 2026-09-22 | Student Management System (Level 1) | Requirements, domain, responsibilities, data structures, API & errors, code quality (Level-1 lens) | 63/100 (Level-1 lens) | Not yet decent — best L1 score, first to clear ≥5 on every criterion |
+| 11 | 2026-09-22 | Student Management System — Level-1 re-score | Close S10's 3 MAJORs (B24, B25, B26) | 67/100 (Level-1 lens) | Not yet decent — closing in on 70 |
+| 12 | 2026-09-22 | Student Management System — Level-1 re-score (regression) | Close remaining MAJOR + B27 | 57/100 (Level-1 lens) | Not yet decent — regressed, lowest score on this problem |
 
 ---
 
@@ -383,7 +524,7 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | G2 | No thread of execution / no simulation loop | closed (S2: `runHoldExpirationWorker` is a real, self-built daemon thread — releases the lock before sleeping, verified sweeping hold-3 within its TTL window) |
 | G3 | God controllers, no layering vocabulary | improving (S5: `LibraryManager` cut 270 → 168 lines to orchestration only, storage behind 3 repositories, new `exceptions/` + `repository/` packages. Still open: the manager lives in `entities`, no `service` package. S4: was 6 maps + search + stock + lending in one class) |
 | G4 | No repository abstraction | improving (S5: `BookRepository`/`InventoryRepository`/`BookingRepository` + in-memory impls, constructor-injected — first Repository use. Caveat: `InventoryRepository` carries a business invariant (non-negative stock, throws `NoCopiesAvailableException`) and splits `isAvailable`/`decrement`. Closes when repeated unprompted in a different problem) |
-| G5 | Presentation fused into domain (`System.out` in entities) | improving (S4 + S5: 0 `System.out` in the domain in both builds. S3 relapsed in `Topic.handleSubscriberFailure`, so it closes only when it holds in a different problem) — S8: relapsed in `SubscriptionManager.newSubscription` (`System.out.println("Already have the same plan")`) |
+| G5 | Presentation fused into domain (`System.out` in entities) | improving (S4 + S5: 0 `System.out` in the domain in both builds. S3 relapsed in `Topic.handleSubscriberFailure`, so it closes only when it holds in a different problem) — S8: relapsed in `SubscriptionManager.newSubscription` (`System.out.println("Already have the same plan")`) — S10: held clean again, 0 `System.out` in `CourseService`/`StudentService`/`EnrollmentService`, third clean data point but given the flip-flop history still not marked closed |
 | G6 | Inheritance for reuse, not IS-A (LSP violations) | open |
 
 ### P1
@@ -394,8 +535,8 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | G9 | No events / no Observer | closed* (S3: `Topic`/`Subscriber`/`Publisher` — real fan-out, correct, not over-engineered. *First-ever use, not a taught-then-transferred case like G1/G2/G10 — no prior session to transfer from, so this is "gap no longer true" rather than proven transfer. Re-verify it shows up unprompted in a later problem before treating the *pattern-selection* instinct itself as trusted.) — **S7 Phase 4: not reached for unprompted** (audit + email proposed as two separate mechanisms); pattern-selection instinct still unproven |
 | G10 | No lock expiry / TTL / reaper | closed (S2: hold expiry + background sweep self-built in `HotelInventory`, no unlock — closes the loop from the *original* Movie Ticket Booking gap where a `SEATS_LOCKED` booking never expired) |
 | G11 | Idempotency modeled but never used | open |
-| G12 | No custom domain exceptions | improving (S5: 4 typed exceptions — `BookNotFound`, `NoCopiesAvailable`, `LoanNotFound`, `AlreadyReturned` — thrown from borrow/return. Still open: `getBook`/`getBooking` return null, `Booking.markReturned` leaks a raw `IllegalStateException`, no common base type, `UserNotFoundException.java` is a 0-byte file, user never validated) — S7: no validation or typed failures again in Subscription Billing (null returns, unknown/removed plan accepted); now a Level-1 item. |
-| G13 | Encapsulation leaks (live collections returned) | improving (S5: all 3 repository finders return `List.copyOf` snapshots — 0 CME in 1.5s vs 16,010 in S4; `Book`/`User` defensively copy. Residual: snapshots still hold the shared mutable `Booking` objects) |
+| G12 | No custom domain exceptions | improving (S5: 4 typed exceptions — `BookNotFound`, `NoCopiesAvailable`, `LoanNotFound`, `AlreadyReturned` — thrown from borrow/return. Still open: `getBook`/`getBooking` return null, `Booking.markReturned` leaks a raw `IllegalStateException`, no common base type, `UserNotFoundException.java` is a 0-byte file, user never validated) — S7: no validation or typed failures again in Subscription Billing (null returns, unknown/removed plan accepted); now a Level-1 item. — S10: real progress — 5 typed exceptions, `getStudent`/`getCourse` throw instead of returning null (fixes the S8 NPE shape), duplicate-enrollment throws instead of returning a UI string. Still open: `StudentService.registerStudent` has no duplicate-id guard (B26). |
+| G13 | Encapsulation leaks (live collections returned) | improving (S5: all 3 repository finders return `List.copyOf` snapshots — 0 CME in 1.5s vs 16,010 in S4; `Book`/`User` defensively copy. Residual: snapshots still hold the shared mutable `Booking` objects) — S10: held again, every list-returning method in `EnrollmentService`/`StudentService` copies before returning |
 | G14 | Telescoping constructors, no Builder | open |
 | G15 | No `Clock` abstraction | open (S4/S5: `LocalDateTime.now()` x2 — S5 moved one *inside* `Booking.markReturned`, so the entity now reaches for the clock; `UUID.randomUUID()` also inline) — S7: `LocalDateTime.now()` inside `MonthlySubscription`; deferred by the level roadmap to Level 4 (parked, not dropped). |
 | G16 | Zero tests | open (S4 regressed vs S3; S5/S6 no change — `Main` is 694 lines of println, no JUnit, no assertions, no concurrent path. Assigned in S3, S4, S5 and S6; three concurrency bugs were fixed in S5–S6 with no test proving any of them) — S7: deferred by the level roadmap to Level 4 (parked, not dropped). |
@@ -430,6 +571,10 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | B21 | Non-idempotent index writes: `InMemoryBookRepository.save` appended to `bookByAuthor`/`bookByTags` on every call — re-saving an id duplicated hits and left the old `Book` indexed under stale tags/author (S5 verified). | improving (S6 verified: re-save leaves exactly 1 index hit and no stale entity; residual NITs: author lists never pruned when empty, `Book` has no `equals`/`hashCode` so `List.remove` relies on identity) |
 | B22 | No happens-before for readers of a synchronized write: `Booking.markReturned()` writes `returnDate` under `synchronized(this)`, but `isReturned()`/`getReturnDate()`/`toString()` read it unsynchronized and the field is not `volatile` (verified 2026-09-21: a spin-reader on `isReturned()` never saw the write in 4s; with `volatile` it did). Same lesson as S3's recall card 3 (HB edge), third shape. **Triggers the §6 cap.** | open |
 | B23 | Return-side partial failure (mirror of B20): `LibraryManager.returnBook` commits `markReturned()` and only then calls `inventoryRepository.increment`; if `increment` throws, the loan is closed and stock is never restored — a retry gets `AlreadyReturnedException`, so the copy is unrecoverable through the API (verified 2026-09-21 with a flaky inventory fake: loan returned, stock 0). | open |
+| B24 | Silent re-enrollment after drop (Student Mgmt): `EnrollmentService.hasActiveEnrollment` only checks whether the *latest* snapshot for (student, course) has status `PROGRESSING` — a `DROPPED` latest snapshot returns false, so `newEnrollment`'s duplicate guard never fires. Contradicts his own Phase-3 decision to block re-enrollment (2026-09-22 verified: enroll → drop → enroll again succeeds silently). | closed same-round (S11: `hasEnrollmentHistory` now checks the *entire* history, not just the latest snapshot — re-enrollment blocked on any prior record, decided and documented on purpose) |
+| B25 | Standing/grades unreachable (Student Mgmt): no code path ever creates a `COMPLETED` enrollment or attaches a real `Grade` — `Grade` is always constructed `null`, `EnrollmentStatus.COMPLETED` and `Grade.getPercentage()` are dead code, despite "standing = grades" being his own Phase-2 scope choice (2026-09-22 verified by reading every call site). | improving (S11: `completeCourse` now creates a real Grade-bearing `COMPLETED` enrollment — the write side works. Still open: `getStudentStanding` filters for latest-status `PROGRESSING` only, so the grade just recorded is invisible through the one method named to show it — verified via his own `Main`, which prints an empty standing right after a recorded 85/100) |
+| B26 | No duplicate-id guard on registration (Student Mgmt): `StudentService.registerStudent` appends to a `List` with no id check; `getStudent`/`exists` linear-scan and return the first match, so a second registration under an existing id becomes a permanently unreachable ghost record still present in `getRegisteredStudents()` (2026-09-22 verified). Same List-vs-Map mistake he'd just fixed for `Course` in the same session. | improving (S11: `Map<Integer,Student>` + `DuplicateStudentException` guard — complete, correct fix; same-problem fix, closes when unprompted elsewhere) |
+| B27 | Dependency-direction inversion (Student Mgmt): fixing "`CourseService.remove` doesn't check active enrollments" (S10 NIT) made `remove` take an `EnrollmentService` as a method parameter — the catalog service now needs enrollment orchestration to do its own job, instead of the check living where enrollment state is owned (S11 verified by reading `CourseService.java`). | open |
 
 ---
 
@@ -471,8 +616,13 @@ _(one added per session; ★ = failed on re-test at least once)_
 |---|---|---|---|
 | 1 | Why can't you call `writeLock().lock()` while already holding `readLock()` on the same `ReentrantReadWriteLock`? | Not a supported upgrade — the write lock requires no readers hold the lock, so the holding thread blocks indefinitely. Release the read lock fully first, then re-check state from scratch since it wasn't held continuously. | |
 | 2 | What specifically moves a gap from `open`/`improving` to `closed` in this ledger? | Solved correctly, unprompted, in a DIFFERENT problem than the one where it was taught or unlocked — not just "worked once where I showed you." | |
-| 3 | Why is "CAS the shared producer cursor forward, then write the payload" unsafe even with a single producer and zero preemption? | The JMM gives no happens-before edge from a plain write that follows a volatile/atomic write in program order to a later read by another thread. The payload write must happen-before the publish signal, never after it. | ★ S7 Phase 0 (2026-09-21): answered "not sure"; the same rule also failed in application in S6 (B22) |
+| 3 | Why is "CAS the shared producer cursor forward, then write the payload" unsafe even with a single producer and zero preemption? | The JMM gives no happens-before edge from a plain write that follows a volatile/atomic write in program order to a later read by another thread. The payload write must happen-before the publish signal, never after it. | ★ S7 Phase 0 (2026-09-21): answered "not sure"; the same rule also failed in application in S6 (B22); ★★ S10 Phase 0 (2026-09-22): answered "consumer can get the null" — a guessed symptom, no mechanism (publish-before-populate; no happens-before edge). Third failure → needs a dedicated drill before Level 5, not another recall card |
 | 4 | A getter takes the read lock, does `map.get(key)` and returns the `List` it found. Is the caller's `for`-loop over it safe against concurrent writers? | No — the lock releases on return, so the caller iterates the live list unlocked while a writer mutates it → CME / data race. Return a snapshot (`List.copyOf`) from inside the lock, or store only immutable lists. | |
 | 5 | Two threads call `returnBook(sameLoanId)`. The manager does `isReturned()` check → `stock.increment()` → `loan.markReturned()`. What goes wrong, and what's the smallest fix? | Both pass the check and both increment → a phantom copy; the check-then-act on `returnDate` isn't atomic. Make the state transition itself atomic (CAS / `synchronized`, returning whether THIS caller won) and increment stock only if you won. | |
 | 6 | `Booking.markReturned()` writes `returnDate` inside `synchronized(this)`; `isReturned()` reads it with no lock and no `volatile`. What can a polling reader observe, and what's the smallest fix? | It may never see the write — no happens-before edge, so the JIT can hoist the read out of the loop. Make the field `volatile` (or synchronize the readers too). | partial, S7 Phase 0: named volatile/synchronized (said "volatile isReturn" — it is the field, and synchronized only works if EVERY reader takes the same monitor); never said what the reader observes (may never see the write) |
 | 7 | A customer subscribes at ₹299; marketing then changes the plan's price to ₹999. What should the customer's subscription say, and how do you guarantee it? | ₹299 — copy the agreed terms into the subscription at subscribe time; never let a contract read its terms from a mutable catalogue entry. | |
+| 8 | What is the first thing you do after any structural change (splitting a class, adding a factory)? | Re-run every flow that worked before and compare the output — a refactor must not change behaviour. | |
+| 9 | Why derive "expired" from the clock instead of keeping a state flag on the subscription? | A stored flag only changes when someone touches the object, so it can say ACTIVE while the clock says expired. Store the timestamps and compute the state from "now" — one source of truth. | partial, S10 Phase 0 (2026-09-22): right conclusion (single source of truth, trust the clock) but blamed "if it broke in between"; missed the mechanism — a flag only changes when something touches the object, and time passing touches nothing |
+| 10 | You fixed Course's lookup from a TreeSet to a Map<id, Course> earlier in a session. StudentService, built minutes later, still uses a List + linear scan with no duplicate-id guard. What should you have done, and when? | The moment a data-structure lesson lands for one entity, check every other service doing the same id-keyed job — it's a general rule, not a Course-specific one. Do it before writing the sibling class, not after review finds it. | |
+| 11 | You added `completeCourse`, which creates a real Grade-bearing enrollment. Your own `Main` calls it and then immediately calls `getStudentStanding`, which prints an empty list. What does that output tell you, and why should code review not have to be the one to catch it? | A method's name is a promise about what it returns — "standing" implied grades, but the implementation only ever looked at `PROGRESSING` status. Reading your own demo's output line-by-line against what you expected it to say catches this before anyone else has to. | |
+| 12 | You reworked `completeCourse` to take a score and the standing queries to surface COMPLETED records — the right fix. Your own demo then prints `obtainedMarks=0` right after passing 85. What single habit would have caught this before you asked for a re-score? | Read your own demo's printed output line by line against what you expected each line to say — not just that it ran without throwing, but that the numbers coming out are the numbers you put in. | |
