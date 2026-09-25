@@ -7,6 +7,52 @@
 
 ## PARKED
 
+- **Session 14 · Expense Sharing (OPENED 2026-09-25, Level-1 lens).** Sahil asked for a new problem right after the S13 score
+  (Meeting Room stays parked at 67, ~20-min finish). Level 1 is now unpassed on FOUR problems (52, 57/67, 67 — pass = 70).
+  Recall cards 12 and 9 retired from the "owed" list (12 shown in practice by the expected-vs-actual demo; 9's idea is card 13).
+  Phase 0 this session = card 13 (last session) + card 7 (S7, never re-tested). Chosen because the core lesson is "store
+  facts, derive views" (balances derived from expenses) — the exact temptation behind B28/B29 — and it needs money + rounding.
+  Phase 1 problem given vague; his Phase 2 must contain questions AND a scope statement (he skipped the statement in S13).
+  **RULE (2026-09-25, from Sahil): the backlog is shown ONLY when he asks for it — never raise it, never gate a grade on it.**
+  Recall answers for cards 13 and 7 were skipped again (4th time) and are now silent backlog.
+  Phase 2 (2026-09-25): dim 1 = **5/10 provisional** (flat vs S13). Good: scope statement present this time; partial-settle
+  question; per-expense participants question. Weak: "private expense" + "Personal Expenses" as a group (scope creep); asked
+  about settle-up but left it out of his own scope; scope #3/#4 ambiguous; no Out list. Missed: WHO PAID, rounding (100/3),
+  edit/delete an expense, pairwise netting. **Locked — In:** users (id, name) pre-registered; many groups, a user in several,
+  balances per group only; creator + initial members, any member can add a member later, no leaving, a newcomer shares only
+  expenses recorded after joining; one payer per expense (a member); participants chosen per expense from current members
+  (payer may or may not be included; at least one participant other than the payer); equal split, rupees to 2 decimals,
+  amount > 0, shares sum exactly to the amount, leftover paise go one each to participants in the order listed; settle = one
+  member pays another in the same group, any amount > 0 up to what they currently owe; views: my groups, my net owe/owed in a
+  group, per-member NETTED breakdown (zero omitted). **Out:** solo expenses, exact/percent splits, edit/delete expense, debt
+  simplification, cross-group netting, currencies, expense-history listing, auth, removing members. Every rejection distinguishable.
+  Next: Phase 3 paper design.
+
+- **Session 13 · Meeting Room Booking (IN PROGRESS, opened 2026-09-24, Level-1 lens).** Phase 0 recall questions were not in
+  his paste — asked after Phase 2 (cards 12 and 9). Phase 2: his 5 questions graded → dim 1 = **5/10 provisional**
+  (good: per-employee overlap rule, history by room + employee, own-bookings query; noise: floors; missed: same-room overlap +
+  back-to-back boundary, cancel, how a room is chosen / availability query, time shape; stated NO scope at all).
+  **Locked scope — In:** rooms fixed at setup (id, floor label, capacity); book a specific room for start/end + attendee count
+  (≤ capacity), same calendar day, start < end; no overlap per room; no overlap per employee; end exclusive (back-to-back OK);
+  owner-only cancel that frees the slot and keeps the record; queries: employee's active bookings by start time, room history,
+  employee history (staff; includes cancelled), free rooms for a slot with capacity ≥ N. **Out:** notifications, calendar
+  sync, recurring, approvals, equipment, auth, room removal, edit/reschedule, office hours, time zones. **Parked by level:**
+  "now" / past-booking rejection / ongoing state → L4 (Clock); simultaneous double-booking → L5; system auto-picks best room →
+  L2. Note: `problems/MeetingRoomSchedular` (399 lines, committed 2026-09-21) already exists — asked if this is a redo; do NOT
+  open it before his Phase 3.
+  **Phase 3 (paper, 2026-09-24): 52/100 provisional** (26/50 on the 5 paper-gradable criteria: requirements 5, domain 6,
+  responsibilities 5, data structures 6, API & errors 4; code quality waits for code). He skipped both recall answers twice and
+  asked for "no more questions" after one Socratic round — so no gauntlet; Sensei issued rulings + a Phase-5 acceptance list
+  instead. Findings: F1 each booking stored in 3 copies + state kept twice (field AND which list) — his defence "for future
+  extension" is speculative (B28); F2 scope creep ×3: `removeBooking` (contradicts "nothing deleted"), COMPLETED/`completeBooking`
+  (no clock → completing a future booking frees its slot), the `EmployeeService` copy; F3 API: employee conflict reported as
+  RoomAlreadyBooked, cancel takes a caller-built Booking + state, `newBooking` trusts a caller-built Booking, raw
+  InvalidArgumentException; F4 free-rooms query + headcount missing; F5 `List<Employee>`/`List<Room>` (same List-vs-Map slip as
+  S10 B26, fixed in S11). Wins: overlap boundary correct (11–12 only), TreeSet O(log n), compensating-rollback instinct,
+  `BookingService(roomService, employeeService)` constructor injection.
+  **Build scored (S13 card): 67/100 Level-1, pass 70.** He kept F1/F2's targets on purpose (mirror copy, completeBooking) — cost graded.
+  ~20-minute finish to cross 70: drop COMPLETED/completeBooking/removeBooking, delete or seal the EmployeeService mirror,
+  cancel by (employeeId, bookingId). Recall answers (cards 12 and 9) still owed — third time skipped.
 - **Student Management System (parked 2026-09-24 after S12, at 57/100 Level-1 lens — best 67 in S11).** Sahil asked for
   another new problem. Level 1 is now unpassed on THREE problems in a row (Subscription 52, SMS 57, best 67; pass = 70).
   Owed to cross 70, all small and concrete: make `Grade` immutable again (build a new one at `completeCourse`, no
@@ -477,6 +523,33 @@ Next session: make Grade immutable again (construct a new one at completeCourse 
   rebuild and Library end-of-day session remain parked.
 ```
 
+```
+SESSION 13 · Meeting Room Booking (new problem, Level 1) · 2026-09-24
+Target: Level-1 bar on a fresh problem — dim 1 Phase 2 (5/10), paper design (52), then the build. Code in problems/EmployeRoomManager.
+Score: 67/100 on the Level-1 lens (40/60: requirements 7, domain 7, responsibilities 5, data structures 8, API & errors 6,
+  code quality 7). Pass mark 70 with every criterion >= 5 -> 3 short; every criterion clears 5 (ties his best, S11 = 67).
+Won:  A self-checking Main (70/70, expected-vs-actual on every scenario) plus a fault-injecting rollback test; my randomized
+        40,000-op comparison against brute force found 0 mismatches — the TreeSet + lower() overlap check with an id tie-break
+        is correct, end-exclusive boundary included. First time his own harness proves a fix (G16 moves; JUnit still L4).
+      Transferred lessons unprompted: registries are Map + duplicate guard from the start (B26), immutable Booking with
+        withState (S10 snapshots), system-assigned id + returned booking, distinct EmployeeAlreadyBooked, no System.out in domain.
+Lost: He kept two rulings' targets and wrote why — the cost is real. completeBooking lets a FUTURE booking be completed, which
+        drops it from the set the overlap check reads, so E2 then books the same slot (probe: ok, two bookings, one slot).
+        The EmployeeService mirror copy is a write-only ledger no rule reads, yet has public addBooking/removeBooking and a
+        live Employee.getBookingData(): touching it makes the two answers disagree (0 vs 1), two employees can share one
+        injected manager, null is accepted and the first booking dies with a raw NullPointerException.
+      cancelBooking still takes a caller-built Booking (a wrong roomId inside it -> BookingNotFound for a booking that
+        exists) and 5 failures are a raw IllegalArgumentException (end<=start, cross-day, headcount<1, duplicate room/employee).
+TRANSFERABLE RULE: A feature added "for the future" still ships today — its bugs count today. completeBooking was outside the
+  locked scope and is the only path that breaks the room's no-overlap rule.
+RECALL CARD -> Q: You add completeBooking, which a caller triggers by hand, with no clock. Which invariant can it break, and
+  what is the general rule? A: It can free a future slot (the booking leaves the BOOKED set that overlap checks read) so the
+  room is double-booked; a hand-set state flag can disagree with time. Store facts, derive states from the clock (card 9).
+Next session: the ~20-minute finish (drop COMPLETED/completeBooking/removeBooking, delete or seal the mirror, cancel by
+  id + typed exceptions for bad input), re-score against the same bar. Then Level 2 on this problem (auto-pick best room).
+  Parked: thread-safety of nextBookingNumber++ / check-then-act in newBooking (L5); Clock + JUnit (L4).
+```
+
 | # | Date | Problem | Target gaps | Score | Verdict |
 |---|------|---------|-------------|-------|---------|
 | 1 | 2026-09-09 – 2026-09-10 | Thread-safe KV Store w/ TTL | G1, G15, G16, G12 | 50/100 (partial) | No Hire — assisted |
@@ -491,6 +564,7 @@ Next session: make Grade immutable again (construct a new one at completeCourse 
 | 10 | 2026-09-22 | Student Management System (Level 1) | Requirements, domain, responsibilities, data structures, API & errors, code quality (Level-1 lens) | 63/100 (Level-1 lens) | Not yet decent — best L1 score, first to clear ≥5 on every criterion |
 | 11 | 2026-09-22 | Student Management System — Level-1 re-score | Close S10's 3 MAJORs (B24, B25, B26) | 67/100 (Level-1 lens) | Not yet decent — closing in on 70 |
 | 12 | 2026-09-22 | Student Management System — Level-1 re-score (regression) | Close remaining MAJOR + B27 | 57/100 (Level-1 lens) | Not yet decent — regressed, lowest score on this problem |
+| 13 | 2026-09-24 | Meeting Room Booking (Level 1, new problem) | Level-1 bar; Phase 2 dim 1 = 5, paper 52 | 67/100 (Level-1 lens) | Not yet decent — 3 short of 70, every criterion >= 5 |
 
 ---
 
@@ -575,6 +649,8 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | B25 | Standing/grades unreachable (Student Mgmt): no code path ever creates a `COMPLETED` enrollment or attaches a real `Grade` — `Grade` is always constructed `null`, `EnrollmentStatus.COMPLETED` and `Grade.getPercentage()` are dead code, despite "standing = grades" being his own Phase-2 scope choice (2026-09-22 verified by reading every call site). | improving (S11: `completeCourse` now creates a real Grade-bearing `COMPLETED` enrollment — the write side works. Still open: `getStudentStanding` filters for latest-status `PROGRESSING` only, so the grade just recorded is invisible through the one method named to show it — verified via his own `Main`, which prints an empty standing right after a recorded 85/100) |
 | B26 | No duplicate-id guard on registration (Student Mgmt): `StudentService.registerStudent` appends to a `List` with no id check; `getStudent`/`exists` linear-scan and return the first match, so a second registration under an existing id becomes a permanently unreachable ghost record still present in `getRegisteredStudents()` (2026-09-22 verified). Same List-vs-Map mistake he'd just fixed for `Course` in the same session. | improving (S11: `Map<Integer,Student>` + `DuplicateStudentException` guard — complete, correct fix; same-problem fix, closes when unprompted elsewhere) |
 | B27 | Dependency-direction inversion (Student Mgmt): fixing "`CourseService.remove` doesn't check active enrollments" (S10 NIT) made `remove` take an `EnrollmentService` as a method parameter — the catalog service now needs enrollment orchestration to do its own job, instead of the check living where enrollment state is owned (S11 verified by reading `CourseService.java`). | open |
+| B28 | Unguarded mirror copy (Meeting Room): `EmployeeService` keeps a write-only copy of every employee's bookings that no rule reads, exposes public `addBooking`/`removeBooking` and a live `Employee.getBookingData()`; `BookingDataManager` is injected by the caller (2026-09-24 verified: shared manager -> E2 sees E1's booking; null manager accepted, first booking throws raw NPE; direct write makes 0 vs 1 disagree). Defended as "for the future" although the locked scope deletes nothing. | open (cost graded in S13) |
+| B29 | State without a clock (Meeting Room): `BookingService.completeBooking` moves a BOOKED booking to COMPLETED by hand; COMPLETED bookings leave the `booked` TreeSet that `hasOverlap` reads, so completing a FUTURE booking lets another employee book the same slot (2026-09-24 verified). Same family as card 9. | open |
 
 ---
 
@@ -626,3 +702,4 @@ _(one added per session; ★ = failed on re-test at least once)_
 | 10 | You fixed Course's lookup from a TreeSet to a Map<id, Course> earlier in a session. StudentService, built minutes later, still uses a List + linear scan with no duplicate-id guard. What should you have done, and when? | The moment a data-structure lesson lands for one entity, check every other service doing the same id-keyed job — it's a general rule, not a Course-specific one. Do it before writing the sibling class, not after review finds it. | |
 | 11 | You added `completeCourse`, which creates a real Grade-bearing enrollment. Your own `Main` calls it and then immediately calls `getStudentStanding`, which prints an empty list. What does that output tell you, and why should code review not have to be the one to catch it? | A method's name is a promise about what it returns — "standing" implied grades, but the implementation only ever looked at `PROGRESSING` status. Reading your own demo's output line-by-line against what you expected it to say catches this before anyone else has to. | |
 | 12 | You reworked `completeCourse` to take a score and the standing queries to surface COMPLETED records — the right fix. Your own demo then prints `obtainedMarks=0` right after passing 85. What single habit would have caught this before you asked for a re-score? | Read your own demo's printed output line by line against what you expected each line to say — not just that it ran without throwing, but that the numbers coming out are the numbers you put in. | |
+| 13 | You add `completeBooking`, which a caller triggers by hand, with no clock. Which invariant can it break, and what is the general rule? | It can free a future slot (the booking leaves the BOOKED set overlap checks read) so the room is double-booked; a hand-set state flag can disagree with time. Store facts, derive states from the clock. | |
