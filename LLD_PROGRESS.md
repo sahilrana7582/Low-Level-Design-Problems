@@ -575,6 +575,31 @@ RECALL CARD -> Q: A comment says "GroupService validates before calling in", yet
 Next: re-score after the requirements/guard/money fixes.
 ```
 
+```
+SESSION 15 · Music Playlist Manager (self-built alone, no Phase 1-3 run) · 2026-09-26
+Target: none assigned — Sahil built it in his own time and asked to be scored (problems/MusicPlaylist, 810 lines). No scope was
+  written, so "requirements covered" is provisional (checked only against the obvious core of a playlist manager).
+Score: 55/100 on the Level-1 lens (33/60: requirements 5 provisional, domain 6, responsibilities 5, data structures 6,
+  API & errors 5, code quality 6). Pass 70 with every criterion >= 5 -> 15 short; no criterion under the floor.
+Won:  Transfers seen unprompted: every registry is a Map<UUID,...> (no List + linear scan — B26 held in a new problem), playlist
+        mutators take (actingUserId, playlistId) and look the playlist up in the acting user's own list so a non-member gets
+        PlaylistNotFound (Meeting Room's id-first API), 13 typed exceptions and no null returns, services return copies, clean
+        constructor-injection arrows (Account -> User -> Artist), composition not inheritance. 80-check self-verifying Main.
+Lost: Effort went to identity plumbing (3 entities, 3 services, 9 of 13 exceptions for accounts/users/artists) while the playlist
+        itself can't be played (no next/previous/shuffle), deleted, renamed, and a song can't be found without its artist id.
+      PlaylistService takes caller-built User/Playable objects and has no collaborator to check them: an unregistered user creates
+        a playlist, a Playable in no catalogue (artist null) and a `new Song(..)` are accepted. Removing a song from the catalogue
+        leaves it in playlists (still plays) and re-adding gives a second identity -> playlist [Two, Two]. User.stopSong() throws
+        NPE with nothing playing, playSong never stops the current one, Song.play()/stop() print from the domain (his Main hijacks
+        System.out to test it). Artist.getSong() returns the live list (add(dup) bypasses SongAlreadyExists, clear() wipes it);
+        createAccount(name, null) poisons the next createAccount with an NPE; isEmailTaken scans all accounts (20,000 = 2.5 s).
+TRANSFERABLE RULE: Write the scope before the first class — without it you cannot tell a missing feature from a choice, and the
+  build drifts toward what is easy (identity plumbing) instead of what the problem is about (playing and managing playlists).
+RECALL CARD -> Q: You start a problem alone. What is the first thing you write down, and what does it protect you from?
+  A: A short scope — the verbs each actor performs, the questions they ask, and an Out list. It protects you from building the
+  easy plumbing and calling the thin core "done", and it gives you something to test against.
+```
+
 | # | Date | Problem | Target gaps | Score | Verdict |
 |---|------|---------|-------------|-------|---------|
 | 1 | 2026-09-09 – 2026-09-10 | Thread-safe KV Store w/ TTL | G1, G15, G16, G12 | 50/100 (partial) | No Hire — assisted |
@@ -591,6 +616,7 @@ Next: re-score after the requirements/guard/money fixes.
 | 12 | 2026-09-22 | Student Management System — Level-1 re-score (regression) | Close remaining MAJOR + B27 | 57/100 (Level-1 lens) | Not yet decent — regressed, lowest score on this problem |
 | 13 | 2026-09-24 | Meeting Room Booking (Level 1, new problem) | Level-1 bar; Phase 2 dim 1 = 5, paper 52 | 67/100 (Level-1 lens) | Not yet decent — 3 short of 70, every criterion >= 5 |
 | 14 | 2026-09-25 | Expense Sharing (Level 1, new problem) | Level-1 bar; Phase 2 dim 1 = 5 | 53/100 (Level-1 lens) | Not yet decent — requirements under the floor (headline features missing) |
+| 15 | 2026-09-26 | Music Playlist Manager (self-built, no coaching phases) | none assigned; requirements provisional | 55/100 (Level-1 lens) | Not yet decent — 15 short, no criterion under the floor |
 
 ---
 
@@ -679,6 +705,8 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | B29 | State without a clock (Meeting Room): `BookingService.completeBooking` moves a BOOKED booking to COMPLETED by hand; COMPLETED bookings leave the `booked` TreeSet that `hasOverlap` reads, so completing a FUTURE booking lets another employee book the same slot (2026-09-24 verified). Same family as card 9. | open |
 | B30 | Unguarded write path (Expense Sharing): `ExpenseService.newExpense` never checks the group, payer or participants; its comment says `GroupService` validates before calling in, but `GroupService` has no expense-creation method and `Main` calls `newExpense` directly (2026-09-25 verified: expense in a nonexistent group, ghost payer, non-user participant all accepted). Reads are member-gated, writes are not. | open |
 | B31 | Money rules unenforced (Expense Sharing): `EqualSplit` drops the remainder (100/3 -> 99.99; 0.10/3 -> 0.09), `newExpense` accepts amount <= 0, empty list -> raw `ArithmeticException`, only-payer list; `Expense.settle` accepts <= 0 and > owed (owes -970.00 after paying 1000 on 30.00; a negative settle raises the debt) and is reachable through no service (2026-09-25 verified). | open |
+| B32 | Caller-built objects trusted (Music Playlist): `PlaylistService.createPlaylist(name, User)`, `addNewUser(.., User)`, `addNewPlayable(.., Playable)` take entities and have no collaborator to validate them (2026-09-26 verified: unregistered user creates a playlist and is added to another; a `Playable` in no catalogue and a `new Song(..)` never registered with its artist are accepted). Same family as B17/B30. | open |
+| B33 | Dangling song references (Music Playlist): `ArtistService.removeSong` never touches playlists, `Song` ids are per-instance UUIDs; a removed song stays in playlists and still plays, and re-adding the same name is accepted as a new identity -> playlist [Two, Two] (2026-09-26 verified). | open |
 
 ---
 
@@ -732,3 +760,4 @@ _(one added per session; ★ = failed on re-test at least once)_
 | 12 | You reworked `completeCourse` to take a score and the standing queries to surface COMPLETED records — the right fix. Your own demo then prints `obtainedMarks=0` right after passing 85. What single habit would have caught this before you asked for a re-score? | Read your own demo's printed output line by line against what you expected each line to say — not just that it ran without throwing, but that the numbers coming out are the numbers you put in. | |
 | 13 | You add `completeBooking`, which a caller triggers by hand, with no clock. Which invariant can it break, and what is the general rule? | It can free a future slot (the booking leaves the BOOKED set overlap checks read) so the room is double-booked; a hand-set state flag can disagree with time. Store facts, derive states from the clock. | |
 | 14 | A comment says "GroupService validates before calling in", yet `Main` calls `ExpenseService.newExpense` directly. What habit would have caught this? | For every rule, find the line that enforces it and the call path from the public entry point your demo uses; grep for callers of the method that is supposed to be the guard. | |
+| 15 | You start a problem alone. What is the first thing you write down, and what does it protect you from? | A short scope — verbs each actor performs, the questions they ask, an Out list. It protects you from building the easy plumbing and calling a thin core done, and gives you something to test against. | |

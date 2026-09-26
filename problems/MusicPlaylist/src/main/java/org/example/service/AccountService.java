@@ -12,10 +12,10 @@ public class AccountService {
     private final Map<UUID, Account> accounts = new HashMap<>();
 
     public Account createAccount(String name, String email) {
+        Account account = new Account(name, email); // rejects an empty name or email before anything is stored
         if (isEmailTaken(email)) {
             throw new AccountAlreadyExists(email);
         }
-        Account account = new Account(name, email);
         accounts.put(account.getId(), account);
         return account;
     }

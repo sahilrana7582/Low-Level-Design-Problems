@@ -10,6 +10,7 @@ import org.example.exception.AccountAlreadyExists;
 import org.example.exception.AccountNotFound;
 import org.example.exception.ArtistAlreadyExists;
 import org.example.exception.ArtistNotFound;
+import org.example.exception.NoSongPlaying;
 import org.example.exception.PlayableAlreadyExist;
 import org.example.exception.PlayableNotFound;
 import org.example.exception.PlaylistNotFound;
@@ -41,7 +42,7 @@ public class Main {
         AccountService accountService = new AccountService();
         UserService userService = new UserService(accountService);
         ArtistService artistService = new ArtistService(userService);
-        PlaylistService playlistService = new PlaylistService();
+        PlaylistService playlistService = new PlaylistService(userService, artistService);
         UUID unknownId = UUID.randomUUID();
 
         // ---------------------------------------------------------------
@@ -65,11 +66,26 @@ public class Main {
                 () -> accountService.getAccount(unknownId));
 
         // ---------------------------------------------------------------
+        section("Accounts: empty input is rejected and nothing is stored");
+        expectError("null email", IllegalArgumentException.class,
+                () -> accountService.createAccount("N", null));
+        expectError("empty email", IllegalArgumentException.class,
+                () -> accountService.createAccount("N", ""));
+        expectError("null name", IllegalArgumentException.class,
+                () -> accountService.createAccount(null, "n@mail.com"));
+        expectError("empty name", IllegalArgumentException.class,
+                () -> accountService.createAccount("", "n@mail.com"));
+        expectError("blank name", IllegalArgumentException.class,
+                () -> accountService.createAccount("   ", "n@mail.com"));
+        expect("the next createAccount still works", "Frank",
+                accountService.createAccount("Frank", "frank@mail.com").getName());
+
+        // ---------------------------------------------------------------
         section("Users (created from an account)");
         User aliceUser = userService.createUser(alice.getId());
         User bobUser = userService.createUser(bob.getId());
-        User carolUser = userService.createUser(carol.getId());
-        User daveUser = userService.createUser(dave.getId());
+        userService.createUser(carol.getId());
+        userService.createUser(dave.getId());
         User weekndUser = userService.createUser(weeknd.getId());
         User duaUser = userService.createUser(dua.getId());
         expect("user id is the account id", alice.getId(), aliceUser.getId());
@@ -118,6 +134,11 @@ public class Main {
                 () -> artistService.addSong(weeknd.getId(), "blinding lights"));
         expectError("add a song to an unknown artist", ArtistNotFound.class,
                 () -> artistService.addSong(unknownId, "Ghost Song"));
+        expectError("add a song with a null name", IllegalArgumentException.class,
+                () -> artistService.addSong(weeknd.getId(), null));
+        expectError("add a song with a blank name", IllegalArgumentException.class,
+                () -> artistService.addSong(weeknd.getId(), "  "));
+        expect("empty song names were not stored", 2, artistService.getSongs(weeknd.getId()).size());
 
         Song blinding = artistService.getSong(weeknd.getId(), "blinding lights");
         expect("getSong ignores letter case", "Blinding Lights", blinding.getName());
@@ -145,41 +166,74 @@ public class Main {
         Song levitating = artistService.getSong(dua.getId(), "Levitating");
 
         // ---------------------------------------------------------------
-        section("Play and stop a song (User.playSong / stopSong)");
-        expect("playing prints", "Blinding Lights music is playing...", captureOutput(() -> aliceUser.playSong(blinding)));
-        expect("stopping prints", "Blinding Lights music is stopped...", captureOutput(aliceUser::stopSong));
+        section("Play and stop (User.playSong / stopSong)");
+        expectError("Alice stops with nothing playing", NoSongPlaying.class, aliceUser::stopSong);
+        expect("Alice plays Blinding Lights", "Blinding Lights music is playing...",
+                captureOutput(() -> aliceUser.playSong(blinding)));
+        expect("Alice plays another song: the first one is stopped first",
+                "Blinding Lights music is stopped...Save Your Tears music is playing...",
+                captureOutput(() -> aliceUser.playSong(tears)));
+        expect("Alice stops", "Save Your Tears music is stopped...", captureOutput(aliceUser::stopSong));
+        expectError("Alice stops again", NoSongPlaying.class, aliceUser::stopSong);
+        expect("stopping twice prints nothing the second time", "", captureOutput(() -> {
+            try {
+                aliceUser.stopSong();
+            } catch (NoSongPlaying ignored) {
+                // expected
+            }
+        }));
+        expect("Bob is not affected by Alice's playback", "Levitating music is playing...",
+                captureOutput(() -> bobUser.playSong(levitating)));
+        expect("Bob stops", "Levitating music is stopped...", captureOutput(bobUser::stopSong));
 
         // ---------------------------------------------------------------
         section("Playlists: create and list");
-        Playlist roadTrip = playlistService.createPlaylist("Road Trip", aliceUser);
+        Playlist roadTrip = playlistService.createPlaylist("Road Trip", alice.getId());
         expect("playlist id is assigned", true, roadTrip.getId() != null);
         expect("playlist name", "Road Trip", roadTrip.getName());
         expect("creator is the first user", Collections.singletonList("Alice"), userNames(roadTrip.getUsers()));
         expect("new playlist has no playables", Collections.emptyList(), playableNames(roadTrip.getAllPlayables()));
-        Playlist gym = playlistService.createPlaylist("Gym", aliceUser);
+        Playlist gym = playlistService.createPlaylist("Gym", alice.getId());
         expect("Alice's playlists", Arrays.asList("Road Trip", "Gym"), playlistNames(playlistService.getUserPlaylists(alice.getId())));
         expect("Bob has no playlists yet", Collections.emptyList(), playlistNames(playlistService.getUserPlaylists(bob.getId())));
         expect("unknown user has no playlists", Collections.emptyList(), playlistNames(playlistService.getUserPlaylists(unknownId)));
         playlistService.getUserPlaylists(alice.getId()).clear();
         expect("clearing the returned playlist list changes nothing", 2, playlistService.getUserPlaylists(alice.getId()).size());
+        expectError("Eve (account but no user) creates a playlist", UserNotFound.class,
+                () -> playlistService.createPlaylist("Ghost List", eve.getId()));
+        expectError("unknown user creates a playlist", UserNotFound.class,
+                () -> playlistService.createPlaylist("Ghost List", unknownId));
+        expect("Eve has no playlists", Collections.emptyList(), playlistNames(playlistService.getUserPlaylists(eve.getId())));
+        expectError("playlist with a null name", IllegalArgumentException.class,
+                () -> playlistService.createPlaylist(null, alice.getId()));
+        expectError("playlist with an empty name", IllegalArgumentException.class,
+                () -> playlistService.createPlaylist("", alice.getId()));
+        expect("failed creates were not stored", 2, playlistService.getUserPlaylists(alice.getId()).size());
 
         // ---------------------------------------------------------------
         section("Playlists: playables");
-        playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), blinding);
-        playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), tears);
-        playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), levitating);
+        playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), weeknd.getId(), "Blinding Lights");
+        playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), weeknd.getId(), "Save Your Tears");
+        playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), dua.getId(), "Levitating");
         expect("Road Trip playables", Arrays.asList("Blinding Lights", "Save Your Tears", "Levitating"),
                 playableNames(roadTrip.getAllPlayables()));
         expectError("add Blinding Lights again", PlayableAlreadyExist.class,
-                () -> playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), blinding));
+                () -> playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), weeknd.getId(), "Blinding Lights"));
+        expectError("add a song the artist never added", SongNotFound.class,
+                () -> playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), weeknd.getId(), "Starboy"));
+        expectError("add a song of an unknown artist", ArtistNotFound.class,
+                () -> playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), unknownId, "Blinding Lights"));
+        expectError("add a song of Alice (not an artist)", ArtistNotFound.class,
+                () -> playlistService.addNewPlayable(alice.getId(), roadTrip.getId(), alice.getId(), "Blinding Lights"));
+        expect("rejected songs were not added", 3, roadTrip.getAllPlayables().size());
         expect("Gym is not affected", Collections.emptyList(), playableNames(gym.getAllPlayables()));
         expect("getOnePlayable", "Save Your Tears", roadTrip.getOnePlayable(tears.getId()).getName());
         expectError("getOnePlayable of unknown id", PlayableNotFound.class,
                 () -> roadTrip.getOnePlayable(unknownId));
         expectError("Bob (not in the playlist) adds a playable", PlaylistNotFound.class,
-                () -> playlistService.addNewPlayable(bob.getId(), roadTrip.getId(), blinding));
+                () -> playlistService.addNewPlayable(bob.getId(), roadTrip.getId(), weeknd.getId(), "Blinding Lights"));
         expectError("Alice adds to an unknown playlist", PlaylistNotFound.class,
-                () -> playlistService.addNewPlayable(alice.getId(), unknownId, blinding));
+                () -> playlistService.addNewPlayable(alice.getId(), unknownId, weeknd.getId(), "Blinding Lights"));
 
         playlistService.removePlayable(alice.getId(), roadTrip.getId(), levitating.getId());
         expect("Road Trip playables after removing Levitating", Arrays.asList("Blinding Lights", "Save Your Tears"),
@@ -193,31 +247,37 @@ public class Main {
 
         // ---------------------------------------------------------------
         section("Playlists: users");
-        playlistService.addNewUser(alice.getId(), roadTrip.getId(), bobUser);
+        playlistService.addNewUser(alice.getId(), roadTrip.getId(), bob.getId());
         expect("Road Trip users", Arrays.asList("Alice", "Bob"), userNames(roadTrip.getUsers()));
         expect("Bob now has Road Trip", Collections.singletonList("Road Trip"), playlistNames(playlistService.getUserPlaylists(bob.getId())));
         expect("Bob sees the same playlist", roadTrip.getId(), playlistService.getUserPlaylists(bob.getId()).get(0).getId());
         expectError("add Bob again", UserAlreadyInPlaylist.class,
-                () -> playlistService.addNewUser(alice.getId(), roadTrip.getId(), bobUser));
+                () -> playlistService.addNewUser(alice.getId(), roadTrip.getId(), bob.getId()));
         expectError("add the creator Alice again", UserAlreadyInPlaylist.class,
-                () -> playlistService.addNewUser(bob.getId(), roadTrip.getId(), aliceUser));
+                () -> playlistService.addNewUser(bob.getId(), roadTrip.getId(), alice.getId()));
         expect("failed adds do not duplicate Bob's list", 1, playlistService.getUserPlaylists(bob.getId()).size());
+        expectError("add Eve (account but no user)", UserNotFound.class,
+                () -> playlistService.addNewUser(alice.getId(), roadTrip.getId(), eve.getId()));
+        expectError("add an unknown user", UserNotFound.class,
+                () -> playlistService.addNewUser(alice.getId(), roadTrip.getId(), unknownId));
+        expect("Road Trip users are unchanged", Arrays.asList("Alice", "Bob"), userNames(roadTrip.getUsers()));
+        expect("Eve got no playlist", Collections.emptyList(), playlistNames(playlistService.getUserPlaylists(eve.getId())));
 
-        playlistService.addNewPlayable(bob.getId(), roadTrip.getId(), levitating);
+        playlistService.addNewPlayable(bob.getId(), roadTrip.getId(), dua.getId(), "Levitating");
         expect("Bob (a member) adds a playable", Arrays.asList("Blinding Lights", "Save Your Tears", "Levitating"),
                 playableNames(roadTrip.getAllPlayables()));
-        playlistService.addNewUser(bob.getId(), roadTrip.getId(), carolUser);
+        playlistService.addNewUser(bob.getId(), roadTrip.getId(), carol.getId());
         expect("Bob (a member) adds Carol", Arrays.asList("Alice", "Bob", "Carol"), userNames(roadTrip.getUsers()));
         expect("Carol has Road Trip", Collections.singletonList("Road Trip"), playlistNames(playlistService.getUserPlaylists(carol.getId())));
         expectError("Dave (not in the playlist) adds a user", PlaylistNotFound.class,
-                () -> playlistService.addNewUser(dave.getId(), roadTrip.getId(), daveUser));
+                () -> playlistService.addNewUser(dave.getId(), roadTrip.getId(), dave.getId()));
 
         playlistService.removeUser(alice.getId(), roadTrip.getId(), carol.getId());
         expect("Road Trip users after removing Carol", Arrays.asList("Alice", "Bob"), userNames(roadTrip.getUsers()));
         expect("Carol no longer has Road Trip", Collections.emptyList(), playlistNames(playlistService.getUserPlaylists(carol.getId())));
         expect("Bob still has Road Trip", Collections.singletonList("Road Trip"), playlistNames(playlistService.getUserPlaylists(bob.getId())));
         expectError("Carol (removed) adds a playable", PlaylistNotFound.class,
-                () -> playlistService.addNewPlayable(carol.getId(), roadTrip.getId(), blinding));
+                () -> playlistService.addNewPlayable(carol.getId(), roadTrip.getId(), weeknd.getId(), "Blinding Lights"));
         expectError("remove Carol again", UserNotInPlaylist.class,
                 () -> playlistService.removeUser(alice.getId(), roadTrip.getId(), carol.getId()));
         expectError("Dave (not in the playlist) removes a user", PlaylistNotFound.class,

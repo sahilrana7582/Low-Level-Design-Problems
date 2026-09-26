@@ -10,6 +10,12 @@ public class Account implements Identity {
     private String email;
 
     public Account(String name, String email) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Account name must not be empty");
+        }
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Account email must not be empty");
+        }
         this.id = UUID.randomUUID();
         this.name = name;
         this.email = email;

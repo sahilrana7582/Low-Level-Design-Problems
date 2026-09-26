@@ -30,6 +30,9 @@ public class Artist implements Identity {
     }
 
     public void addNewSong(String songName) {
+        if (songName == null || songName.isBlank()) {
+            throw new IllegalArgumentException("Song name must not be empty");
+        }
         Optional<Song> song = songs.stream()
                 .filter(s -> s.getName().equalsIgnoreCase(songName))
                 .findFirst();

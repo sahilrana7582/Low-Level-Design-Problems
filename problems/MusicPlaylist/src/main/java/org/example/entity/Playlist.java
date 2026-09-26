@@ -18,6 +18,9 @@ public class Playlist {
 
     // The creator is the first user of the playlist.
     public Playlist(String name, User creator) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Playlist name must not be empty");
+        }
         this.id = UUID.randomUUID();
         this.name = name;
         this.users.add(creator);
