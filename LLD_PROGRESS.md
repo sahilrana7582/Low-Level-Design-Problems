@@ -26,7 +26,7 @@
   member pays another in the same group, any amount > 0 up to what they currently owe; views: my groups, my net owe/owed in a
   group, per-member NETTED breakdown (zero omitted). **Out:** solo expenses, exact/percent splits, edit/delete expense, debt
   simplification, cross-group netting, currencies, expense-history listing, auth, removing members. Every rejection distinguishable.
-  Next: Phase 3 paper design.
+  Phase 3 paper questions (Q1–Q5) were left unanswered; he built V1 directly. **V1 scored 53/100 Level-1 (S14 card).**
 
 - **Session 13 · Meeting Room Booking (IN PROGRESS, opened 2026-09-24, Level-1 lens).** Phase 0 recall questions were not in
   his paste — asked after Phase 2 (cards 12 and 9). Phase 2: his 5 questions graded → dim 1 = **5/10 provisional**
@@ -550,6 +550,31 @@ Next session: the ~20-minute finish (drop COMPLETED/completeBooking/removeBookin
   Parked: thread-safety of nextBookingNumber++ / check-then-act in newBooking (L5); Clock + JUnit (L4).
 ```
 
+```
+SESSION 14 · Expense Sharing (new problem, Level 1) · 2026-09-25
+Target: Level-1 bar on a fresh problem — Phase 2 dim 1 = 5/10, paper design, then a V1 build (problems/ExpenseTracker). He built V1
+  without answering the five Phase-3 questions; Q1, Q3, Q4 and Q5 each predicted a break that the probes then found.
+Score: 53/100 on the Level-1 lens (32/60: requirements 4, domain 7, responsibilities 5, data structures 5, API & errors 5,
+  code quality 6). Pass 70 with every criterion >= 5 -> requirements is under the floor.
+Won:  Expense is now a real ledger — one shared expense with an immutable PAY transaction (payer, total) and SETTLE transactions —
+        so the fact survives (Phase-3 Q1 answered in code). Arrows are clean: no cycle, User no longer holds a service, maps keyed by
+        id not by User object. First idempotency he modelled AND used: caller-supplied expenseId, a double-click throws
+        ExpenseAlreadyExist. BigDecimal, defensive copies, member-gated reads, self-checking Main (67/67, expected vs actual).
+Lost: The two headline features are absent: no settle-up on any service (0 methods; only Expense.settle on an entity that
+        getGroupExpenses hands out live) and no "total owe/owed" or per-member "who owes whom" view — B pays 90 for A,B,C and B's
+        view is {v1: 0.00}. newExpense is unguarded: the comment says GroupService validates before calling in, but nothing calls
+        in and Main calls it directly (phantom group, ghost payer, non-user participant all accepted). Money rules unmet: 100/3 sums
+        to 99.99, amount -50 and 0 accepted, empty list -> raw ArithmeticException, settle 1000 on a 30.00 debt -> owes -970.00,
+        settle -10 raises the debt. newGroup(A,B,A) fails after A and B were already indexed -> a ghost group in their lists.
+        Three registries are List + linear scan again (S10's slip): 20,000 newExpense = 473 ms.
+TRANSFERABLE RULE: A check you only describe in a comment does not exist — trace each rule to the exact line that enforces it,
+  starting from the method your own demo calls.
+RECALL CARD -> Q: A comment says "GroupService validates before calling in", yet Main calls ExpenseService.newExpense directly.
+  What habit would have caught this? A: For every rule, find the line that enforces it and the call path from the public entry
+  point your demo uses; grep for callers of the method that is supposed to be guarded.
+Next: re-score after the requirements/guard/money fixes.
+```
+
 | # | Date | Problem | Target gaps | Score | Verdict |
 |---|------|---------|-------------|-------|---------|
 | 1 | 2026-09-09 – 2026-09-10 | Thread-safe KV Store w/ TTL | G1, G15, G16, G12 | 50/100 (partial) | No Hire — assisted |
@@ -565,6 +590,7 @@ Next session: the ~20-minute finish (drop COMPLETED/completeBooking/removeBookin
 | 11 | 2026-09-22 | Student Management System — Level-1 re-score | Close S10's 3 MAJORs (B24, B25, B26) | 67/100 (Level-1 lens) | Not yet decent — closing in on 70 |
 | 12 | 2026-09-22 | Student Management System — Level-1 re-score (regression) | Close remaining MAJOR + B27 | 57/100 (Level-1 lens) | Not yet decent — regressed, lowest score on this problem |
 | 13 | 2026-09-24 | Meeting Room Booking (Level 1, new problem) | Level-1 bar; Phase 2 dim 1 = 5, paper 52 | 67/100 (Level-1 lens) | Not yet decent — 3 short of 70, every criterion >= 5 |
+| 14 | 2026-09-25 | Expense Sharing (Level 1, new problem) | Level-1 bar; Phase 2 dim 1 = 5 | 53/100 (Level-1 lens) | Not yet decent — requirements under the floor (headline features missing) |
 
 ---
 
@@ -608,7 +634,7 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | G8 | Business policy hardcoded in logic | open |
 | G9 | No events / no Observer | closed* (S3: `Topic`/`Subscriber`/`Publisher` — real fan-out, correct, not over-engineered. *First-ever use, not a taught-then-transferred case like G1/G2/G10 — no prior session to transfer from, so this is "gap no longer true" rather than proven transfer. Re-verify it shows up unprompted in a later problem before treating the *pattern-selection* instinct itself as trusted.) — **S7 Phase 4: not reached for unprompted** (audit + email proposed as two separate mechanisms); pattern-selection instinct still unproven |
 | G10 | No lock expiry / TTL / reaper | closed (S2: hold expiry + background sweep self-built in `HotelInventory`, no unlock — closes the loop from the *original* Movie Ticket Booking gap where a `SEATS_LOCKED` booking never expired) |
-| G11 | Idempotency modeled but never used | open |
+| G11 | Idempotency modeled but never used | improving (S14: caller-supplied `expenseId`, a duplicate submit throws `ExpenseAlreadyExistException` — first idempotency he modelled AND used; closes when repeated unprompted in another problem) |
 | G12 | No custom domain exceptions | improving (S5: 4 typed exceptions — `BookNotFound`, `NoCopiesAvailable`, `LoanNotFound`, `AlreadyReturned` — thrown from borrow/return. Still open: `getBook`/`getBooking` return null, `Booking.markReturned` leaks a raw `IllegalStateException`, no common base type, `UserNotFoundException.java` is a 0-byte file, user never validated) — S7: no validation or typed failures again in Subscription Billing (null returns, unknown/removed plan accepted); now a Level-1 item. — S10: real progress — 5 typed exceptions, `getStudent`/`getCourse` throw instead of returning null (fixes the S8 NPE shape), duplicate-enrollment throws instead of returning a UI string. Still open: `StudentService.registerStudent` has no duplicate-id guard (B26). |
 | G13 | Encapsulation leaks (live collections returned) | improving (S5: all 3 repository finders return `List.copyOf` snapshots — 0 CME in 1.5s vs 16,010 in S4; `Book`/`User` defensively copy. Residual: snapshots still hold the shared mutable `Booking` objects) — S10: held again, every list-returning method in `EnrollmentService`/`StudentService` copies before returning |
 | G14 | Telescoping constructors, no Builder | open |
@@ -651,6 +677,8 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | B27 | Dependency-direction inversion (Student Mgmt): fixing "`CourseService.remove` doesn't check active enrollments" (S10 NIT) made `remove` take an `EnrollmentService` as a method parameter — the catalog service now needs enrollment orchestration to do its own job, instead of the check living where enrollment state is owned (S11 verified by reading `CourseService.java`). | open |
 | B28 | Unguarded mirror copy (Meeting Room): `EmployeeService` keeps a write-only copy of every employee's bookings that no rule reads, exposes public `addBooking`/`removeBooking` and a live `Employee.getBookingData()`; `BookingDataManager` is injected by the caller (2026-09-24 verified: shared manager -> E2 sees E1's booking; null manager accepted, first booking throws raw NPE; direct write makes 0 vs 1 disagree). Defended as "for the future" although the locked scope deletes nothing. | open (cost graded in S13) |
 | B29 | State without a clock (Meeting Room): `BookingService.completeBooking` moves a BOOKED booking to COMPLETED by hand; COMPLETED bookings leave the `booked` TreeSet that `hasOverlap` reads, so completing a FUTURE booking lets another employee book the same slot (2026-09-24 verified). Same family as card 9. | open |
+| B30 | Unguarded write path (Expense Sharing): `ExpenseService.newExpense` never checks the group, payer or participants; its comment says `GroupService` validates before calling in, but `GroupService` has no expense-creation method and `Main` calls `newExpense` directly (2026-09-25 verified: expense in a nonexistent group, ghost payer, non-user participant all accepted). Reads are member-gated, writes are not. | open |
+| B31 | Money rules unenforced (Expense Sharing): `EqualSplit` drops the remainder (100/3 -> 99.99; 0.10/3 -> 0.09), `newExpense` accepts amount <= 0, empty list -> raw `ArithmeticException`, only-payer list; `Expense.settle` accepts <= 0 and > owed (owes -970.00 after paying 1000 on 30.00; a negative settle raises the debt) and is reachable through no service (2026-09-25 verified). | open |
 
 ---
 
@@ -703,3 +731,4 @@ _(one added per session; ★ = failed on re-test at least once)_
 | 11 | You added `completeCourse`, which creates a real Grade-bearing enrollment. Your own `Main` calls it and then immediately calls `getStudentStanding`, which prints an empty list. What does that output tell you, and why should code review not have to be the one to catch it? | A method's name is a promise about what it returns — "standing" implied grades, but the implementation only ever looked at `PROGRESSING` status. Reading your own demo's output line-by-line against what you expected it to say catches this before anyone else has to. | |
 | 12 | You reworked `completeCourse` to take a score and the standing queries to surface COMPLETED records — the right fix. Your own demo then prints `obtainedMarks=0` right after passing 85. What single habit would have caught this before you asked for a re-score? | Read your own demo's printed output line by line against what you expected each line to say — not just that it ran without throwing, but that the numbers coming out are the numbers you put in. | |
 | 13 | You add `completeBooking`, which a caller triggers by hand, with no clock. Which invariant can it break, and what is the general rule? | It can free a future slot (the booking leaves the BOOKED set overlap checks read) so the room is double-booked; a hand-set state flag can disagree with time. Store facts, derive states from the clock. | |
+| 14 | A comment says "GroupService validates before calling in", yet `Main` calls `ExpenseService.newExpense` directly. What habit would have caught this? | For every rule, find the line that enforces it and the call path from the public entry point your demo uses; grep for callers of the method that is supposed to be the guard. | |
