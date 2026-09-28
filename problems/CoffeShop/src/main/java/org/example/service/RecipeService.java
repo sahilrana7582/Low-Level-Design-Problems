@@ -5,35 +5,34 @@ import org.example.enums.CoffeeType;
 import org.example.exception.RecipeAlreadyExistException;
 import org.example.exception.RecipeNotExistException;
 
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 public class RecipeService {
-    private final HashSet<Recipe> recipes;
+    private final Map<CoffeeType, Recipe> recipes;
 
     public RecipeService(){
-        this.recipes = new HashSet<>();
+        this.recipes = new HashMap<>();
     }
 
     public void addRecipe(String name, double milk, double coffee, double sugar, CoffeeType coffeeType){
+        // Recipe's constructor rejects negative amounts, so a bad recipe never reaches the map.
         Recipe newRecipe = new Recipe(name, coffeeType, milk, coffee, sugar);
-        if(recipes.contains(newRecipe)){
+        if(recipes.containsKey(coffeeType)){
             throw new RecipeAlreadyExistException(String.format("Name: %s, CoffeeType: %s recipe already exist", name, coffeeType));
         }
 
-        recipes.add(newRecipe);
+        recipes.put(coffeeType, newRecipe);
     }
 
     public Recipe getRecipe(CoffeeType coffeeType) {
         Objects.requireNonNull(coffeeType, "Coffee type must not be null");
 
-        return recipes.stream()
-                .filter(recipe -> coffeeType == recipe.getCoffeeType())
-                .findFirst()
-                .orElseThrow(() ->
-                        new RecipeNotExistException(
-                                "Recipe not found for coffee type: " + coffeeType
-                        )
-                );
+        Recipe recipe = recipes.get(coffeeType);
+        if (recipe == null) {
+            throw new RecipeNotExistException("Recipe not found for coffee type: " + coffeeType);
+        }
+        return recipe;
     }
 }

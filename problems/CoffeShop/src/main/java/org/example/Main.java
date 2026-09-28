@@ -62,11 +62,18 @@ public class Main {
         expect("latte recipe coffee", 20.0, latteRecipe.getCoffee());
         expect("latte recipe sugar", 5.0, latteRecipe.getSugar());
 
-        // Recipe.equals() compares by coffeeType only, so a second Latte recipe with different
-        // ingredients still counts as a duplicate of the first.
+        // Recipes are keyed by coffeeType, so a second Latte recipe is a duplicate regardless
+        // of its own ingredients.
         expectError("add a second recipe for an already-registered type", RecipeAlreadyExistException.class,
                 () -> recipeService.addRecipe("Vanilla Latte", 200, 30, 10, CoffeeType.Latte));
         expect("the original latte recipe is unchanged", 150.0, recipeService.getRecipe(CoffeeType.Latte).getMilk());
+
+        expectError("add a recipe with negative milk", IllegalArgumentException.class,
+                () -> recipeService.addRecipe("Free Latte", -1000, 20, 5, CoffeeType.Cappuccino));
+        expectMoney("a rejected negative-milk recipe left Cappuccino's recipe unchanged",
+                100.0, recipeService.getRecipe(CoffeeType.Cappuccino).getMilk());
+        expectMoney("inventory milk is untouched too (nothing was ever prepared with it)",
+                500.0, inventoryService.getTotalMilk());
 
         // ---------------------------------------------------------------
         section("Menu");

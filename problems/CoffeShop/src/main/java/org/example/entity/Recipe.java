@@ -2,8 +2,6 @@ package org.example.entity;
 
 import org.example.enums.CoffeeType;
 
-import java.util.Objects;
-
 public class Recipe {
 
     private String name;
@@ -17,6 +15,9 @@ public class Recipe {
                   double milk,
                   double coffee,
                   double sugar) {
+        if (milk < 0 || coffee < 0 || sugar < 0) {
+            throw new IllegalArgumentException("Recipe ingredient amounts cannot be negative");
+        }
         this.name = name;
         this.coffeeType = coffeeType;
         this.milk = milk;
@@ -42,23 +43,5 @@ public class Recipe {
 
     public double getSugar() {
         return sugar;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-
-        if (!(o instanceof Recipe recipe)) {
-            return false;
-        }
-
-        return coffeeType == recipe.coffeeType;
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(coffeeType);
     }
 }

@@ -678,6 +678,38 @@ RECALL CARD -> Q: You added freeWeight and wired it into ShipmentService.cancelS
   skips freeWeight entirely; the leak is fixed only on the one path you tested, not at its root (the public mutator itself).
 ```
 
+```
+SESSION 19 · Coffee Shop (self-built alone, no Phase 1-3 run) · 2026-09-28
+Target: none assigned — built alone, no written scope (4th self-built problem running with no Phase 2). Graded against the
+  obvious core of a coffee-shop LLD: menu, recipes, inventory, preparing a drink, handling insufficient stock.
+Score: 53/100 on the Level-1 lens (32/60: requirements 5, domain 6, responsibilities 6, data structures 5, API & errors 4,
+  code quality 6). Pass 70 with every criterion >= 5 -> API & errors is under the floor.
+Won:  Genuine Factory Method (Coffee interface, 3 implementations, CoffeeFactory.createCoffee switching on the enum) done
+        cleanly, with a comment explaining why the stateless factory is called directly instead of injected. RecipeService/
+        InventoryService/CoffeeService are single-purpose with no god class; CoffeeService is the only orchestrator. First-ever
+        deliberate test isolation: Main builds separate throwaway services (emptyRecipeService, a 5-unit tinyInventory)
+        specifically so failure-path tests cannot corrupt the shared happy-path state used by the rest of the demo. Typed
+        exceptions, no null returns, Inventory.addX validates non-negative amounts. Unprompted ReentrantLock around
+        prepareCoffee's critical section (concurrency correctness itself not graded at Level 1, so not scored either way).
+Lost: RecipeService.addRecipe has ZERO validation — a recipe can be registered with a NEGATIVE ingredient amount, and
+        Inventory.consume does totalMilk -= recipe.getMilk(), so a negative amount ADDS to the inventory instead of consuming
+        it: verified a single prepare with a -1000-milk recipe took a 100-unit inventory to 1,100, and 5 more calls to 6,100 -
+        the recipe manufactures its own ingredients, unbounded. RecipeService uses a HashSet<Recipe> with equals()/hashCode()
+        keyed ONLY on coffeeType instead of a Map<CoffeeType,Recipe>, even though coffeeType is already the natural key: this
+        forces getRecipe into an O(n) stream().filter() scan instead of an O(1) get, AND produces a surprising equals()
+        contract where two recipes with completely different milk/coffee/sugar count as equal (verified: cheap.equals(fancy)
+        == true). No price, order, bill or payment concept anywhere - a "shop" with no transaction. CoffeeFactory's switch
+        has an explicit case for all 3 CoffeeType values, so its `default -> throw "Basic coffee not supported"` is dead code
+        (a leftover from a removed 4th type). Recipe's fields are not final despite having no setters.
+TRANSFERABLE RULE: An entity that only HAS setters can still be corrupted through its constructor - validate at the one place
+  data enters (the constructor or the service that builds it), not only on the methods that look like "the dangerous ones";
+  a recipe felt like configuration, not user input, and that's exactly why it went unchecked.
+RECALL CARD -> Q: Inventory.addMilk rejects a negative amount. RecipeService.addRecipe does not check its milk/coffee/sugar
+  arguments at all. What is the concrete consequence, and what's the general lesson? A: consume() does `total -= recipe.getX()`,
+  so a negative recipe amount adds to inventory instead of subtracting - preparing that coffee manufactures ingredients out of
+  thin air, unbounded. Validate every value at its entry point, not just the ones on a path already labeled "risky".
+```
+
 | # | Date | Problem | Target gaps | Score | Verdict |
 |---|------|---------|-------------|-------|---------|
 | 1 | 2026-09-09 – 2026-09-10 | Thread-safe KV Store w/ TTL | G1, G15, G16, G12 | 50/100 (partial) | No Hire — assisted |
@@ -697,6 +729,7 @@ RECALL CARD -> Q: You added freeWeight and wired it into ShipmentService.cancelS
 | 15 | 2026-09-26 | Music Playlist Manager (self-built, no coaching phases) | none assigned; requirements provisional | 55/100 (Level-1 lens) | Not yet decent — 15 short, no criterion under the floor |
 | 17 | 2026-09-26 | Logistics Management System (self-built, no coaching phases) | requirements from his own Main.java comment | 57/100 (Level-1 lens) | Not yet decent — 13 short (later revised, see S18) |
 | 18 | 2026-09-28 | Logistics Management System — re-score after fixes | F1 (open), F2/F4 (his fixes); F3 descoped, F5 dropped per his instruction | 62/100 (Level-1 lens) | Not yet decent — 8 short, root cause of F1/F2 still open |
+| 19 | 2026-09-28 | Coffee Shop (self-built, no coaching phases) | requirements vs the obvious core (no written scope) | 53/100 (Level-1 lens) | Not yet decent — 17 short, API & errors under the floor |
 | 16 | 2026-09-26 | Music Playlist Manager — re-score after fixes | F2/F4/part of F5 fixed by him | 62/100 (Level-1 lens) | Not yet decent — 8 short, no regressions |
 
 ---
@@ -784,6 +817,8 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | B27 | Dependency-direction inversion (Student Mgmt): fixing "`CourseService.remove` doesn't check active enrollments" (S10 NIT) made `remove` take an `EnrollmentService` as a method parameter — the catalog service now needs enrollment orchestration to do its own job, instead of the check living where enrollment state is owned (S11 verified by reading `CourseService.java`). | open |
 | B28 | Unguarded mirror copy (Meeting Room): `EmployeeService` keeps a write-only copy of every employee's bookings that no rule reads, exposes public `addBooking`/`removeBooking` and a live `Employee.getBookingData()`; `BookingDataManager` is injected by the caller (2026-09-24 verified: shared manager -> E2 sees E1's booking; null manager accepted, first booking throws raw NPE; direct write makes 0 vs 1 disagree). Defended as "for the future" although the locked scope deletes nothing. | open (cost graded in S13) |
 | B35 | Guard bypass via public entity mutators (Logistics): `Shipment.assignVehicle/cancelShipment/deliverShipment` are public with no service in the way; `ShipmentService`'s checks (cancelled, already-assigned) and `VehicleAssignmentService.freeWeight` wiring only apply on the path through the service (2026-09-26/28 verified: direct calls skip both; a fake, never-registered `Vehicle` can be attached via direct `assignVehicle`, and two direct cancel/deliver calls each leaked vehicle capacity permanently, later starving a smaller shipment that should have fit). Same family as B32/B34. Status: open (S18: the capacity-release fix was added but only on the service path, root cause untouched). | open |
+| B37 | Unvalidated recipe -> unbounded inventory (Coffee Shop): `RecipeService.addRecipe` accepts any milk/coffee/sugar value with no check, and `Inventory.consume` does `total -= recipe.getX()`, so a negative ingredient amount adds to stock instead of subtracting it (2026-09-28 verified: a -1000-milk recipe took a 100-unit inventory to 1,100 after one prepare, 6,100 after five more). | open |
+| B38 | Wrong structure + surprising equals (Coffee Shop): `RecipeService` uses `HashSet<Recipe>` with `Recipe.equals()/hashCode()` keyed only on `coffeeType` instead of `Map<CoffeeType,Recipe>`, forcing `getRecipe` into an O(n) `stream().filter()` scan and making two recipes with entirely different ingredients compare equal (2026-09-28 verified: `cheap.equals(fancy) == true` for differently-provisioned Latte recipes). | open |
 | B36 | Aggregate-only validation (Logistics): `ShipmentService.createShipment` rejects a non-positive TOTAL weight/cost but not an individual package's negative weight or quantity, so a physically invalid package is accepted whenever a later package's magnitude makes the sum positive (2026-09-28 verified: -100 + 200 -> totalWeight 100.0). | open |
 | B29 | State without a clock (Meeting Room): `BookingService.completeBooking` moves a BOOKED booking to COMPLETED by hand; COMPLETED bookings leave the `booked` TreeSet that `hasOverlap` reads, so completing a FUTURE booking lets another employee book the same slot (2026-09-24 verified). Same family as card 9. | open |
 | B30 | Unguarded write path (Expense Sharing): `ExpenseService.newExpense` never checks the group, payer or participants; its comment says `GroupService` validates before calling in, but `GroupService` has no expense-creation method and `Main` calls `newExpense` directly (2026-09-25 verified: expense in a nonexistent group, ghost payer, non-user participant all accepted). Reads are member-gated, writes are not. | open |
@@ -847,4 +882,5 @@ _(one added per session; ★ = failed on re-test at least once)_
 | 15 | You start a problem alone. What is the first thing you write down, and what does it protect you from? | A short scope — verbs each actor performs, the questions they ask, an Out list. It protects you from building the easy plumbing and calling a thin core done, and gives you something to test against. | |
 | 17 | ShipmentService.assignVehicle checks CANCELLED and already-assigned before calling shipment.assignVehicle(vehicle). What is unprotected, and what closes it? | shipment.assignVehicle is itself public, so any caller holding the Shipment can call it directly and skip both checks and the real vehicle's capacity accounting; make the entity's mutator package-private or take a capability only the service can supply. | |
 | 18 | You added freeWeight and wired it into ShipmentService.cancelShipment/deliverShipment. Does that close the S17 finding that Shipment's mutators are public? | No — calling shipment.cancelShipment() directly still skips freeWeight entirely; the leak is fixed only on the one path you tested, not at its root (the public mutator itself). | |
+| 19 | Inventory.addMilk rejects a negative amount; RecipeService.addRecipe does not check milk/coffee/sugar at all. What is the concrete consequence, and what's the general lesson? | consume() does total -= recipe.getX(), so a negative recipe amount adds to inventory instead of subtracting - preparing that coffee manufactures ingredients unbounded. Validate every value at its entry point, not only the ones on a path already labeled "risky". | |
 | 16 | You made PlaylistService validate ids. What else must you check before calling the fix done? | Every other route to the same state — the Playlist objects it returns still have public mutators; hand out snapshots or keep the mutators reachable only from the service. | |
