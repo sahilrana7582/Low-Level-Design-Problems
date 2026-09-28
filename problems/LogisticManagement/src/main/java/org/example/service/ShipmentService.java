@@ -40,6 +40,10 @@ public class ShipmentService {
             throw new UserNotExistException(String.format("User: %s is not exist", userId));
         }
 
+        if(packages == null || packages.isEmpty()){
+            throw new IllegalArgumentException("Shipment must have at least one package");
+        }
+
         double totalWeight = packages
                 .parallelStream()
                 .mapToDouble(PackageItem::getWeight)
@@ -49,6 +53,10 @@ public class ShipmentService {
                 .stream()
                 .mapToDouble(costCalculatorService::calculatePackageCost)
                 .sum();
+
+        if(totalShipmentCost <= 0 || totalWeight <= 0){
+            throw new IllegalArgumentException("Shipment must have at least one package with a positive weight and cost");
+        }
 
         UUID shipmentId = UUID.randomUUID();
 
@@ -75,7 +83,7 @@ public class ShipmentService {
         }
 
         Vehicle vehicle = vehicleAssignmentService.getVehicle(shipment);
-        shipment.assignVehicle(vehicle.getVehicleType());
+        shipment.assignVehicle(vehicle);
         return vehicle;
     }
 
@@ -96,10 +104,20 @@ public class ShipmentService {
     }
 
     public void cancelShipment(UUID shipmentId) {
-        getShipment(shipmentId).cancelShipment();
+        Shipment shipment = getShipment(shipmentId);
+        Vehicle assignedVehicle = shipment.getAssignedVehicle(); // read before cancelShipment() clears it
+        shipment.cancelShipment(); // throws before anything below runs if cancelling isn't allowed
+        if (assignedVehicle != null) {
+            vehicleAssignmentService.freeWeight(assignedVehicle, shipment.getTotalWeight());
+        }
     }
 
     public void deliverShipment(UUID shipmentId) {
-        getShipment(shipmentId).deliverShipment();
+        Shipment shipment = getShipment(shipmentId);
+        Vehicle assignedVehicle = shipment.getAssignedVehicle();
+        shipment.deliverShipment(); // throws before anything below runs if delivering isn't allowed
+        if (assignedVehicle != null) {
+            vehicleAssignmentService.freeWeight(assignedVehicle, shipment.getTotalWeight());
+        }
     }
 }

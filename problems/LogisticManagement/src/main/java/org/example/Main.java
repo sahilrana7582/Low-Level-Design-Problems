@@ -152,6 +152,14 @@ public class Main {
                 () -> shipmentService.assignVehicle(s6));
 
         // ---------------------------------------------------------------
+        section("Cancel gives the vehicle its capacity back");
+        expectMoney("van remaining before cancelling s2", 10.0, van.getRemainingCapacity());
+        shipmentService.cancelShipment(s2.getId());
+        expect("s2 status is CANCELLED", ShipmentStatus.CANCELLED, s2.getStatus());
+        expect("s2 no longer has an assigned vehicle", null, s2.getAssignedVehicle());
+        expectMoney("van remaining after cancelling s2 (10 + 50)", 60.0, van.getRemainingCapacity());
+
+        // ---------------------------------------------------------------
         section("Cancel shipment");
         Shipment s7 = shipmentService.createShipment(alice.getId(), Collections.singletonList(
                 new PackageItem("Gift", "box", 1, PackageType.GARMENTS, 1.0)
@@ -161,8 +169,11 @@ public class Main {
         expect("cancelling twice does not error (idempotent)", ShipmentStatus.CANCELLED, s7.getStatus());
         shipmentService.cancelShipment(s7.getId());
 
+        expectMoney("truck remaining before delivering s4", 985.0, truck.getRemainingCapacity());
         shipmentService.deliverShipment(s4.getId());
         expect("s4 status is DELIVERED", ShipmentStatus.DELIVERED, s4.getStatus());
+        expect("a delivered shipment still remembers its vehicle", VehicleType.TRUCK, s4.getAssignedVehicleType());
+        expectMoney("truck remaining fully restored after delivering s4 (985 + 15)", 1000.0, truck.getRemainingCapacity());
         expectError("cancel an already-delivered shipment", ShipmentAlreadyDeliveredException.class,
                 () -> shipmentService.cancelShipment(s4.getId()));
         expectError("cancel an unknown shipment id", ShipmentNotFoundException.class,

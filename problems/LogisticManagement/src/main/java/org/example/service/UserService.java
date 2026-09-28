@@ -17,13 +17,15 @@ public class UserService {
     }
 
     public User newUser(String name, int age, String email){
-        if(registeredEmails.contains(email)){
+        String normalizedEmail = email.toLowerCase();
+
+        if(registeredEmails.contains(normalizedEmail)){
             throw new EmailAlreadyExistException(String.format("Email: %s already exist. Try New", email));
         }
 
         UUID id = UUID.randomUUID();
         User user = new User(id, name, age, email);
-        registeredEmails.add(email);
+        registeredEmails.add(normalizedEmail);
         users.put(id, user);
         return user;
     }

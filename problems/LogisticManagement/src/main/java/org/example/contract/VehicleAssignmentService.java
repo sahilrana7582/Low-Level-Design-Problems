@@ -5,4 +5,5 @@ import org.example.entity.Vehicle;
 
 public interface VehicleAssignmentService {
     Vehicle getVehicle(Shipment shipment);
+    void freeWeight(Vehicle vehicle, double weight);
 }

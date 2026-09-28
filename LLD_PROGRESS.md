@@ -624,6 +624,60 @@ RECALL CARD -> Q: You made PlaylistService validate ids. What else must you chec
   reachable only from the service.
 ```
 
+```
+SESSION 17 · Logistics Management System (self-built alone, no Phase 1-3 run) · 2026-09-26
+Target: none assigned — built alone, scored against his own 10-item requirements comment atop Main.java (no separate scope
+  written). Score below was revised in S18 after he said 2 of those 10 items were never in scope (he forgot to say so up front).
+Score: 57/100 on the Level-1 lens (34/60: requirements 5, domain 7, responsibilities 5, data structures 6, API & errors 5,
+  code quality 6). Pass 70 with every criterion >= 5 -> 13 short.
+Won:  First real Strategy pattern since his very first (pre-tutoring) problem: CostCalculationService and VehicleAssignmentService
+        are genuine interfaces, one impl each, constructor-injected. TreeSet-by-remaining-capacity with correct remove-before-
+        mutate-then-reinsert gives a real smallest-fits-first vehicle search. Self-aware comment flagging his own gap in the code
+        (a shipment can be delivered with no vehicle ever assigned) instead of hiding it. 45-check self-verifying Main.
+Lost: Shipment.assignVehicle/cancelShipment/deliverShipment are public on the entity with no service in the way — calling
+        assignVehicle(VehicleType.TRUCK) directly moves the shipment to VEHICLE_ASSIGNED with no real vehicle ever touched, since
+        assignedVehicleType was only an enum, not a reference. cancelShipment never returns a cancelled shipment's weight to the
+        vehicle it was assigned to (verified: bike stays at reduced capacity forever after a cancel). Negative quantity/weight
+        accepted (cost computed as -250); empty package list accepted; email uniqueness case-sensitive (regression vs his own
+        equalsIgnoreCase habit elsewhere). Two of his own ten listed requirements (origin/destination, driver-vehicle linkage)
+        were never built — later confirmed as never actually in scope, so this half of the finding does not count against him.
+TRANSFERABLE RULE: A public mutator on an entity is a second door into the state your service thinks it alone controls — an
+  invariant enforced only in the service is not enforced at all while the entity's own methods stay public.
+RECALL CARD -> Q: ShipmentService.assignVehicle checks CANCELLED and already-assigned before calling shipment.assignVehicle(vehicle).
+  What is unprotected, and what closes it? A: shipment.assignVehicle is itself public, so any caller holding the Shipment can call
+  it directly and skip both checks and the real vehicle's capacity accounting; make the entity's mutator package-private or take a
+  capability only the service can supply.
+```
+
+```
+SESSION 18 · Logistics Management System — re-score after his fixes · 2026-09-28
+Target: he fixed F2 (vehicle capacity release) and F4 (input validation, email case) himself; told Sensei F3 (origin/destination,
+  driver linkage) was never in scope and to drop the F5 NITs — both honored, requirements re-graded against the corrected scope.
+Score: 62/100 on the Level-1 lens (37/60: requirements 7, domain 7, responsibilities 5, data structures 6, API & errors 6,
+  code quality 6). Was 57 in S17 (not directly comparable — F3 removed from scope). Pass 70 -> 8 short; no criterion under floor.
+Won:  Requirements re-graded clean now that origin/destination and driver linkage are correctly out of scope: everything else on
+        his own list is covered. Vehicle capacity release is real and correct FOR THE PATH HE WIRED IT TO: assignedVehicleType (enum)
+        became assignedVehicle (a real Vehicle reference), VehicleAssignmentService gained freeWeight with the same correct
+        remove-before-mutate-reinsert pattern as getVehicle, and ShipmentService.cancelShipment/deliverShipment both call it —
+        verified: cancelling a 10-unit shipment now returns the bike from 5 to 15 remaining. createShipment now rejects a null/empty
+        package list and a non-positive aggregate weight or cost. Email uniqueness fixed via a normalized (lowercased) index while
+        the display name keeps its original case — the right shape of fix. Main grew 45 -> 52 checks, each fix has a test.
+Lost: F1 from S17 was NOT fixed — Shipment.assignVehicle/cancelShipment/deliverShipment are still public with no gate, and F2's
+        fix inherits that same open door: calling s.cancelShipment() or s.deliverShipment() DIRECTLY (bypassing ShipmentService)
+        still leaks the vehicle's capacity forever, because freeWeight is wired into the SERVICE methods only, not the entity's own.
+        Verified by chaining exactly that: two shipments assigned then cancelled/delivered by calling the entity directly leaked
+        their weight, and a later, smaller shipment that should have fit the same bike was then rejected with
+        VehicleNotAvailableException because the leaked weight was never given back. assignVehicle(Vehicle) taking a live object
+        also got worse in one way: a shipment can now hold a reference to a Vehicle that was never added to VehicleService at all.
+        Aggregate-only validation still has a hole: a single package with a physically negative weight or quantity is accepted
+        whenever a later package in the same shipment makes the SUM positive (verified: -100 + 200 -> totalWeight 100.0, accepted).
+TRANSFERABLE RULE: A fix wired into the service that calls the entity is not the same fix as closing the entity's own door — if the
+  entity's mutator is still public, the exact bug you just fixed is still reachable one call away, through the entity itself.
+RECALL CARD -> Q: You added freeWeight and wired it into ShipmentService.cancelShipment/deliverShipment. Does that close the S17
+  finding that Shipment's mutators are public? A: No — calling shipment.cancelShipment() directly (not through the service) still
+  skips freeWeight entirely; the leak is fixed only on the one path you tested, not at its root (the public mutator itself).
+```
+
 | # | Date | Problem | Target gaps | Score | Verdict |
 |---|------|---------|-------------|-------|---------|
 | 1 | 2026-09-09 – 2026-09-10 | Thread-safe KV Store w/ TTL | G1, G15, G16, G12 | 50/100 (partial) | No Hire — assisted |
@@ -641,6 +695,8 @@ RECALL CARD -> Q: You made PlaylistService validate ids. What else must you chec
 | 13 | 2026-09-24 | Meeting Room Booking (Level 1, new problem) | Level-1 bar; Phase 2 dim 1 = 5, paper 52 | 67/100 (Level-1 lens) | Not yet decent — 3 short of 70, every criterion >= 5 |
 | 14 | 2026-09-25 | Expense Sharing (Level 1, new problem) | Level-1 bar; Phase 2 dim 1 = 5 | 53/100 (Level-1 lens) | Not yet decent — requirements under the floor (headline features missing) |
 | 15 | 2026-09-26 | Music Playlist Manager (self-built, no coaching phases) | none assigned; requirements provisional | 55/100 (Level-1 lens) | Not yet decent — 15 short, no criterion under the floor |
+| 17 | 2026-09-26 | Logistics Management System (self-built, no coaching phases) | requirements from his own Main.java comment | 57/100 (Level-1 lens) | Not yet decent — 13 short (later revised, see S18) |
+| 18 | 2026-09-28 | Logistics Management System — re-score after fixes | F1 (open), F2/F4 (his fixes); F3 descoped, F5 dropped per his instruction | 62/100 (Level-1 lens) | Not yet decent — 8 short, root cause of F1/F2 still open |
 | 16 | 2026-09-26 | Music Playlist Manager — re-score after fixes | F2/F4/part of F5 fixed by him | 62/100 (Level-1 lens) | Not yet decent — 8 short, no regressions |
 
 ---
@@ -727,6 +783,8 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | B26 | No duplicate-id guard on registration (Student Mgmt): `StudentService.registerStudent` appends to a `List` with no id check; `getStudent`/`exists` linear-scan and return the first match, so a second registration under an existing id becomes a permanently unreachable ghost record still present in `getRegisteredStudents()` (2026-09-22 verified). Same List-vs-Map mistake he'd just fixed for `Course` in the same session. | improving (S11: `Map<Integer,Student>` + `DuplicateStudentException` guard — complete, correct fix; same-problem fix, closes when unprompted elsewhere) |
 | B27 | Dependency-direction inversion (Student Mgmt): fixing "`CourseService.remove` doesn't check active enrollments" (S10 NIT) made `remove` take an `EnrollmentService` as a method parameter — the catalog service now needs enrollment orchestration to do its own job, instead of the check living where enrollment state is owned (S11 verified by reading `CourseService.java`). | open |
 | B28 | Unguarded mirror copy (Meeting Room): `EmployeeService` keeps a write-only copy of every employee's bookings that no rule reads, exposes public `addBooking`/`removeBooking` and a live `Employee.getBookingData()`; `BookingDataManager` is injected by the caller (2026-09-24 verified: shared manager -> E2 sees E1's booking; null manager accepted, first booking throws raw NPE; direct write makes 0 vs 1 disagree). Defended as "for the future" although the locked scope deletes nothing. | open (cost graded in S13) |
+| B35 | Guard bypass via public entity mutators (Logistics): `Shipment.assignVehicle/cancelShipment/deliverShipment` are public with no service in the way; `ShipmentService`'s checks (cancelled, already-assigned) and `VehicleAssignmentService.freeWeight` wiring only apply on the path through the service (2026-09-26/28 verified: direct calls skip both; a fake, never-registered `Vehicle` can be attached via direct `assignVehicle`, and two direct cancel/deliver calls each leaked vehicle capacity permanently, later starving a smaller shipment that should have fit). Same family as B32/B34. Status: open (S18: the capacity-release fix was added but only on the service path, root cause untouched). | open |
+| B36 | Aggregate-only validation (Logistics): `ShipmentService.createShipment` rejects a non-positive TOTAL weight/cost but not an individual package's negative weight or quantity, so a physically invalid package is accepted whenever a later package's magnitude makes the sum positive (2026-09-28 verified: -100 + 200 -> totalWeight 100.0). | open |
 | B29 | State without a clock (Meeting Room): `BookingService.completeBooking` moves a BOOKED booking to COMPLETED by hand; COMPLETED bookings leave the `booked` TreeSet that `hasOverlap` reads, so completing a FUTURE booking lets another employee book the same slot (2026-09-24 verified). Same family as card 9. | open |
 | B30 | Unguarded write path (Expense Sharing): `ExpenseService.newExpense` never checks the group, payer or participants; its comment says `GroupService` validates before calling in, but `GroupService` has no expense-creation method and `Main` calls `newExpense` directly (2026-09-25 verified: expense in a nonexistent group, ghost payer, non-user participant all accepted). Reads are member-gated, writes are not. | open |
 | B31 | Money rules unenforced (Expense Sharing): `EqualSplit` drops the remainder (100/3 -> 99.99; 0.10/3 -> 0.09), `newExpense` accepts amount <= 0, empty list -> raw `ArithmeticException`, only-payer list; `Expense.settle` accepts <= 0 and > owed (owes -970.00 after paying 1000 on 30.00; a negative settle raises the debt) and is reachable through no service (2026-09-25 verified). | open |
@@ -787,4 +845,6 @@ _(one added per session; ★ = failed on re-test at least once)_
 | 13 | You add `completeBooking`, which a caller triggers by hand, with no clock. Which invariant can it break, and what is the general rule? | It can free a future slot (the booking leaves the BOOKED set overlap checks read) so the room is double-booked; a hand-set state flag can disagree with time. Store facts, derive states from the clock. | |
 | 14 | A comment says "GroupService validates before calling in", yet `Main` calls `ExpenseService.newExpense` directly. What habit would have caught this? | For every rule, find the line that enforces it and the call path from the public entry point your demo uses; grep for callers of the method that is supposed to be the guard. | |
 | 15 | You start a problem alone. What is the first thing you write down, and what does it protect you from? | A short scope — verbs each actor performs, the questions they ask, an Out list. It protects you from building the easy plumbing and calling a thin core done, and gives you something to test against. | |
+| 17 | ShipmentService.assignVehicle checks CANCELLED and already-assigned before calling shipment.assignVehicle(vehicle). What is unprotected, and what closes it? | shipment.assignVehicle is itself public, so any caller holding the Shipment can call it directly and skip both checks and the real vehicle's capacity accounting; make the entity's mutator package-private or take a capability only the service can supply. | |
+| 18 | You added freeWeight and wired it into ShipmentService.cancelShipment/deliverShipment. Does that close the S17 finding that Shipment's mutators are public? | No — calling shipment.cancelShipment() directly still skips freeWeight entirely; the leak is fixed only on the one path you tested, not at its root (the public mutator itself). | |
 | 16 | You made PlaylistService validate ids. What else must you check before calling the fix done? | Every other route to the same state — the Playlist objects it returns still have public mutators; hand out snapshots or keep the mutators reachable only from the service. | |

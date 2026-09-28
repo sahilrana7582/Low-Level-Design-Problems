@@ -17,7 +17,7 @@ public class Shipment {
 
     private ShipmentStatus status;
     private final double totalWeight;
-    private VehicleType assignedVehicleType;
+    private Vehicle assignedVehicle;
     private final double shipmentCost;
 
     public Shipment(
@@ -55,16 +55,21 @@ public class Shipment {
         return totalWeight;
     }
 
+    // Kept for convenience: the type of whatever vehicle is currently assigned, if any.
     public VehicleType getAssignedVehicleType() {
-        return assignedVehicleType;
+        return assignedVehicle == null ? null : assignedVehicle.getVehicleType();
+    }
+
+    public Vehicle getAssignedVehicle() {
+        return assignedVehicle;
     }
 
     public double getShipmentCost() {
         return shipmentCost;
     }
 
-    public void assignVehicle(VehicleType vehicleType) {
-        this.assignedVehicleType = vehicleType;
+    public void assignVehicle(Vehicle vehicle) {
+        this.assignedVehicle = vehicle;
         this.status = ShipmentStatus.VEHICLE_ASSIGNED;
     }
 
@@ -80,7 +85,7 @@ public class Shipment {
         }
 
         this.status = ShipmentStatus.CANCELLED;
-        this.assignedVehicleType = null;
+        this.assignedVehicle = null;
     }
 
     public void deliverShipment() {

@@ -39,4 +39,8 @@ public class Vehicle {
     public void addWeight(double weight) {
         this.currentWeight += weight;
     }
+
+    public void releaseWeight(double weight) {
+        this.currentWeight -= weight;
+    }
 }
