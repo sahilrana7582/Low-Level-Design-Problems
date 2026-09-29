@@ -7,6 +7,26 @@
 
 ## PARKED
 
+- **Session 21 · Task Management System (OPENED 2026-09-29, Level-1 lens).** New problem, fresh scaffold at
+  `problems/TaskManagementSystem` (Main.java is still the IntelliJ default template — no real code yet). Phase 0 recall asked
+  (card 20: Coffee Shop constructor-validation placement; card from Meeting Room B29/completeBooking) but skipped — per his
+  2026-09-25 rule, not gated on, dropped silently, no backlog language used.
+  Phase 2 (2026-09-29): dim 1 = **4/10 provisional**. Good: assignee cardinality question (shapes the data model); deadline/
+  due-date question. Decent but imperfect: creator-role question; priority question conflates two things (a priority FIELD vs
+  enforced completion ORDER). No scope statement given at all (regression vs Meeting Room/Expense Sharing, which both had one).
+  Missed, ranked: the task lifecycle/state machine (not asked at all — the central entity's defining behavior); team/workspace
+  boundary (one flat pool vs many); who may edit/reassign/transition status; how tasks are queried/viewed (mine vs everyone's);
+  edit/delete a task.
+  **Locked — In:** users (id, name) pre-registered, no auth/roles; one flat task pool (no teams/projects/boards yet); any user
+  may create a task; a task has title, description, creator, ONE assignee (multi-assignee parked to a later level), a fixed
+  priority enum (LOW/MEDIUM/HIGH, informational only — no enforced completion order), and a due date (date only, no time-of-day,
+  no overdue computation — that needs a Clock, parked to L4); status lifecycle TODO → IN_PROGRESS → DONE, plus CANCELLED
+  reachable from TODO/IN_PROGRESS but not from DONE; only the creator or the assignee may change status, edit title/description,
+  or reassign; edit/reassign blocked once DONE; nothing is deleted (CANCELLED instead); views: my assigned tasks (by status), my
+  created tasks, all tasks (staff-like). **Out:** sub-tasks, dependencies, comments/attachments, notifications, multiple teams/
+  projects, auth, multiple assignees, overdue/time-based logic, enforced work-queue ordering. Every rejection distinguishable.
+  Next: Phase 3 paper design.
+
 - **Session 14 · Expense Sharing (OPENED 2026-09-25, Level-1 lens).** Sahil asked for a new problem right after the S13 score
   (Meeting Room stays parked at 67, ~20-min finish). Level 1 is now unpassed on FOUR problems (52, 57/67, 67 — pass = 70).
   Recall cards 12 and 9 retired from the "owed" list (12 shown in practice by the expected-vs-actual demo; 9's idea is card 13).
@@ -710,6 +730,32 @@ RECALL CARD -> Q: Inventory.addMilk rejects a negative amount. RecipeService.add
   thin air, unbounded. Validate every value at its entry point, not just the ones on a path already labeled "risky".
 ```
 
+```
+SESSION 20 · Coffee Shop — re-score after his fixes · 2026-09-28
+Target: he fixed F1 (unvalidated recipe) and F3 (wrong data structure) himself; told Sensei F2 (no price/order/payment) was
+  never in scope. F4 (dead default branch) and F5 (non-final Recipe fields) were left untouched.
+Score: 72/100 on the Level-1 lens (43/60: requirements 7, domain 7, responsibilities 7, data structures 8, API & errors 7,
+  code quality 7). Was 53 in S19 (not directly comparable - F2 removed from scope). Pass mark is 70 -> PASSED. First-ever
+  Level-1 pass across all problems attempted (Subscription 52, SMS best 67, Meeting Room 67, Expense Sharing 62, Music
+  Playlist 62, Logistics 62 were the previous ceiling).
+Won:  F1 closed at the right layer: Recipe's OWN constructor now rejects a negative milk/coffee/sugar, so the invariant is
+        guarded where the data enters, not bolted onto RecipeService - verified the exploit is gone (negative-milk recipe now
+        throws IllegalArgumentException immediately) and Main tests it plus "a rejected recipe leaves the old one and the
+        inventory both untouched". F3 closed cleanly: RecipeService is now Map<CoffeeType,Recipe>, no custom equals/hashCode
+        on Recipe at all (removed, not just unused) - verified O(1): 2,000,000 getRecipe calls in 7ms, was 75ms with the old
+        HashSet+stream().filter(). A self-documenting comment states WHY no double-check is needed in the service ("Recipe's
+        constructor rejects negative amounts, so a bad recipe never reaches the map") - shows he understands the invariant,
+        not just patched a symptom. Main grew 39 -> 42 checks with a test for the exact exploit that was found.
+Lost: F4 (CoffeeFactory's dead default branch, unreachable for all 3 known CoffeeType values) and F5 (Recipe's fields still
+        not final despite having no setters) were both left open - neither is severe enough to block the pass.
+TRANSFERABLE RULE: Validating an invariant on the entity's own constructor (not the service that happens to call it) means
+  every future caller gets the protection for free, including ones you haven't written yet - the fix generalizes past the
+  one call site that exposed it.
+RECALL CARD -> Q: You fixed the recipe exploit by validating inside Recipe's constructor rather than adding a check to
+  RecipeService.addRecipe. Why does that placement matter? A: A constructor check protects every path that ever creates a
+  Recipe, present or future; a check in one service only protects callers that go through that exact method.
+```
+
 | # | Date | Problem | Target gaps | Score | Verdict |
 |---|------|---------|-------------|-------|---------|
 | 1 | 2026-09-09 – 2026-09-10 | Thread-safe KV Store w/ TTL | G1, G15, G16, G12 | 50/100 (partial) | No Hire — assisted |
@@ -730,6 +776,7 @@ RECALL CARD -> Q: Inventory.addMilk rejects a negative amount. RecipeService.add
 | 17 | 2026-09-26 | Logistics Management System (self-built, no coaching phases) | requirements from his own Main.java comment | 57/100 (Level-1 lens) | Not yet decent — 13 short (later revised, see S18) |
 | 18 | 2026-09-28 | Logistics Management System — re-score after fixes | F1 (open), F2/F4 (his fixes); F3 descoped, F5 dropped per his instruction | 62/100 (Level-1 lens) | Not yet decent — 8 short, root cause of F1/F2 still open |
 | 19 | 2026-09-28 | Coffee Shop (self-built, no coaching phases) | requirements vs the obvious core (no written scope) | 53/100 (Level-1 lens) | Not yet decent — 17 short, API & errors under the floor |
+| 20 | 2026-09-28 | Coffee Shop — re-score after fixes | F1/F3 fixed; F2 descoped; F4/F5 left open | 72/100 (Level-1 lens) | **PASS — first Level-1 pass** |
 | 16 | 2026-09-26 | Music Playlist Manager — re-score after fixes | F2/F4/part of F5 fixed by him | 62/100 (Level-1 lens) | Not yet decent — 8 short, no regressions |
 
 ---
@@ -818,7 +865,8 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | B28 | Unguarded mirror copy (Meeting Room): `EmployeeService` keeps a write-only copy of every employee's bookings that no rule reads, exposes public `addBooking`/`removeBooking` and a live `Employee.getBookingData()`; `BookingDataManager` is injected by the caller (2026-09-24 verified: shared manager -> E2 sees E1's booking; null manager accepted, first booking throws raw NPE; direct write makes 0 vs 1 disagree). Defended as "for the future" although the locked scope deletes nothing. | open (cost graded in S13) |
 | B35 | Guard bypass via public entity mutators (Logistics): `Shipment.assignVehicle/cancelShipment/deliverShipment` are public with no service in the way; `ShipmentService`'s checks (cancelled, already-assigned) and `VehicleAssignmentService.freeWeight` wiring only apply on the path through the service (2026-09-26/28 verified: direct calls skip both; a fake, never-registered `Vehicle` can be attached via direct `assignVehicle`, and two direct cancel/deliver calls each leaked vehicle capacity permanently, later starving a smaller shipment that should have fit). Same family as B32/B34. Status: open (S18: the capacity-release fix was added but only on the service path, root cause untouched). | open |
 | B37 | Unvalidated recipe -> unbounded inventory (Coffee Shop): `RecipeService.addRecipe` accepts any milk/coffee/sugar value with no check, and `Inventory.consume` does `total -= recipe.getX()`, so a negative ingredient amount adds to stock instead of subtracting it (2026-09-28 verified: a -1000-milk recipe took a 100-unit inventory to 1,100 after one prepare, 6,100 after five more). | open |
-| B38 | Wrong structure + surprising equals (Coffee Shop): `RecipeService` uses `HashSet<Recipe>` with `Recipe.equals()/hashCode()` keyed only on `coffeeType` instead of `Map<CoffeeType,Recipe>`, forcing `getRecipe` into an O(n) `stream().filter()` scan and making two recipes with entirely different ingredients compare equal (2026-09-28 verified: `cheap.equals(fancy) == true` for differently-provisioned Latte recipes). | open |
+| B37f | (closed, S20) RecipeService/Recipe fixed: validation moved into Recipe's constructor; verified exploit gone. | closed |
+| B38 | Wrong structure + surprising equals (Coffee Shop): `RecipeService` uses `HashSet<Recipe>` with `Recipe.equals()/hashCode()` keyed only on `coffeeType` instead of `Map<CoffeeType,Recipe>`, forcing `getRecipe` into an O(n) `stream().filter()` scan and making two recipes with entirely different ingredients compare equal (2026-09-28 verified: `cheap.equals(fancy) == true` for differently-provisioned Latte recipes). | closed (S20: Map<CoffeeType,Recipe>, equals/hashCode removed from Recipe entirely, verified O(1) - 2M lookups in 7ms) |
 | B36 | Aggregate-only validation (Logistics): `ShipmentService.createShipment` rejects a non-positive TOTAL weight/cost but not an individual package's negative weight or quantity, so a physically invalid package is accepted whenever a later package's magnitude makes the sum positive (2026-09-28 verified: -100 + 200 -> totalWeight 100.0). | open |
 | B29 | State without a clock (Meeting Room): `BookingService.completeBooking` moves a BOOKED booking to COMPLETED by hand; COMPLETED bookings leave the `booked` TreeSet that `hasOverlap` reads, so completing a FUTURE booking lets another employee book the same slot (2026-09-24 verified). Same family as card 9. | open |
 | B30 | Unguarded write path (Expense Sharing): `ExpenseService.newExpense` never checks the group, payer or participants; its comment says `GroupService` validates before calling in, but `GroupService` has no expense-creation method and `Main` calls `newExpense` directly (2026-09-25 verified: expense in a nonexistent group, ghost payer, non-user participant all accepted). Reads are member-gated, writes are not. | open |
@@ -883,4 +931,5 @@ _(one added per session; ★ = failed on re-test at least once)_
 | 17 | ShipmentService.assignVehicle checks CANCELLED and already-assigned before calling shipment.assignVehicle(vehicle). What is unprotected, and what closes it? | shipment.assignVehicle is itself public, so any caller holding the Shipment can call it directly and skip both checks and the real vehicle's capacity accounting; make the entity's mutator package-private or take a capability only the service can supply. | |
 | 18 | You added freeWeight and wired it into ShipmentService.cancelShipment/deliverShipment. Does that close the S17 finding that Shipment's mutators are public? | No — calling shipment.cancelShipment() directly still skips freeWeight entirely; the leak is fixed only on the one path you tested, not at its root (the public mutator itself). | |
 | 19 | Inventory.addMilk rejects a negative amount; RecipeService.addRecipe does not check milk/coffee/sugar at all. What is the concrete consequence, and what's the general lesson? | consume() does total -= recipe.getX(), so a negative recipe amount adds to inventory instead of subtracting - preparing that coffee manufactures ingredients unbounded. Validate every value at its entry point, not only the ones on a path already labeled "risky". | |
+| 20 | You fixed the recipe exploit by validating inside Recipe's constructor rather than adding a check to RecipeService.addRecipe. Why does that placement matter? | A constructor check protects every path that ever creates a Recipe, present or future; a check in one service only protects callers that go through that exact method. | |
 | 16 | You made PlaylistService validate ids. What else must you check before calling the fix done? | Every other route to the same state — the Playlist objects it returns still have public mutators; hand out snapshots or keep the mutators reachable only from the service. | |
