@@ -25,7 +25,8 @@
   or reassign; edit/reassign blocked once DONE; nothing is deleted (CANCELLED instead); views: my assigned tasks (by status), my
   created tasks, all tasks (staff-like). **Out:** sub-tasks, dependencies, comments/attachments, notifications, multiple teams/
   projects, auth, multiple assignees, overdue/time-based logic, enforced work-queue ordering. Every rejection distinguishable.
-  Next: Phase 3 paper design.
+  Phase 3 was skipped (went straight to code, no paper design sent). **V1 scored 63/100 Level-1 (S21 card)** — the due-date field
+  was also dropped from the locked scope, unflagged, the same session multi-assignee was added beyond it, also unflagged.
 
 - **Session 14 · Expense Sharing (OPENED 2026-09-25, Level-1 lens).** Sahil asked for a new problem right after the S13 score
   (Meeting Room stays parked at 67, ~20-min finish). Level 1 is now unpassed on FOUR problems (52, 57/67, 67 — pass = 70).
@@ -756,6 +757,69 @@ RECALL CARD -> Q: You fixed the recipe exploit by validating inside Recipe's con
   Recipe, present or future; a check in one service only protects callers that go through that exact method.
 ```
 
+```
+SESSION 21 · Task Management System (new problem, Level 1) · 2026-09-29
+Target: Level-1 bar on a fresh problem. Phase 2 dim 1 = 4/10 (no scope statement, missed the task lifecycle question). Phase 3
+  skipped (straight to code). He opened this scoring round with a pre-emptive claim ("no validation for the user because you
+  said there's no need") that does not match the locked scope ("no auth/roles" meant no login/permission LAYER, not "skip
+  existence checks") or his own code, which validates user existence thoroughly at task creation and assignment.
+Score: 63/100 on the Level-1 lens (38/60: requirements 5, domain 6, responsibilities 6, data structures 8, API & errors 6,
+  code quality 7). Pass 70 with every criterion >= 5 -> 7 short; no criterion under the floor. Best data-structures score to
+  date on any problem (no List+linear-scan registry anywhere - a first).
+Won:  Every registry is an id-keyed Map (users, tasks, a user's tasks), LinkedHashSet preserves assignment order, and
+        getTasksForUser returns Stream.toList() (genuinely immutable, stronger than a mutable defensive copy - verified
+        UnsupportedOperationException on the caller trying to clear it). Six well-named, correctly-thrown typed exceptions.
+        Task validates its own invariants in its own constructor/setters (name/description trimmed and non-blank, priority/
+        creator non-null) - the Coffee Shop lesson (validate at the entity, not the caller) applied here, unprompted.
+        Comments explain WHY, not just what (terminal-state locking, LinkedHashSet's ordering guarantee, why Stream.toList()
+        beats a defensive copy). Main is a 48-check self-verifying harness covering unknown ids, unauthorized actors, and
+        state-locking, including a fault-injection-style "the returned list truly cannot be mutated" check.
+Lost: Three scope changes were made without being flagged as changes. (1) The locked rule was "creator OR assignee may
+        transition status/edit/reassign"; the build is creator-ONLY (Main's own section header says so) - the assignee, i.e.
+        the person actually doing the work, can never mark their own task IN_PROGRESS or DONE (verified). (2) The due date
+        field, explicitly in the locked scope, does not exist anywhere on Task. (3) Assignees became a Set (many) when the
+        lock said one, parked to a later level - unlike (1) and (2) this direction isn't harmful, but it is still an
+        unflagged change to what was agreed. Separately: Task.<init> checks `assignees.contains(null)`, which throws
+        NullPointerException("null") for the perfectly valid, idiomatic Set.of() - Java's immutable-collection factories
+        reject a null ARGUMENT to contains() outright, unlike HashSet/Collections.emptySet() (verified: Set.of() crashes,
+        Collections.emptySet() does not) - exactly the modern-Java style his own profile favors. User's own constructor has
+        zero validation (null id, blank name, null email all silently accepted), unlike Task in the same codebase - the
+        failure only surfaces later as an unrelated NullPointerException inside UserService.addUser's toLowerCase() call,
+        far from where the bad data was actually built.
+TRANSFERABLE RULE: A locked scope is an agreement, not a suggestion - if the build ends up different (stricter, looser, or
+  just missing a field), say so when handing it over instead of letting the reviewer find the diff; a self-diagnosis is only
+  useful when it's checked against what's actually there, not asserted from memory of the conversation.
+RECALL CARD -> Q: The locked scope said "creator or assignee may change status." Main.java's own section header says "Only
+  the creator can modify a task," and Bob (the assignee) gets UnauthorizedTaskModificationException for marking his own task
+  IN_PROGRESS. What does this tell you to do before handing work back for a score? A: Diff what you built against what was
+  locked, one line at a time, and call out every place they disagree - whether you think your version is better or you just
+  changed it without noticing - rather than assert what the scope was from memory.
+```
+
+```
+SESSION 22 · Logger (first Go problem, self-built, Level 1) · 2026-10-15
+Asked: "no advanced jargon, just make it good LLD practice, I've done almost all the functionality." Delivered a reviewed
+  Level-1 version in Go/logger-lld-v2/ (his Go/logger-lld/ left untouched) + 5 plain-language findings. No concurrency, rotation
+  or tests raised (staged levels).
+Score: 47/100 on the Level-1 lens (28/60: requirements 4, domain 6, responsibilities 4, data structures 7, API & errors 3,
+  code quality 4). API & errors under the floor.
+Won:  LogLevel as its own int type with ordered constants, and the filter as a single ordered compare (permitLog) - right
+        model. A Logger interface up front. Input trimmed + case-insensitive. Append-mode daily file, dir created if missing.
+Lost: (F1) Warn and Error call permitLog(..., DEBUG) - copy-paste slip - so at INFO/WARN/ERROR both are silently dropped;
+        New("error") then Error() writes nothing (verified at all 5 levels). Same family as S8's Monthly-calls-Weekly copy.
+      (F2) Info writes to the file, Debug/Warn/Error to the console; the declared destination type is never used (verified).
+      (F3) New("fatal") hits an empty case, stays at the zero value DEBUG and logs everything (verified).
+      (F4) New calls log.Fatal (exits the caller's whole program) and creates logs/ + today's file BEFORE validating the
+        level - New("warning") leaves an empty file and exits 1 (verified).
+      (F5) No Close(); New returns the unexported *logger though a Logger interface exists; GetLogLevel switches on magic
+        0-3. Minor: with a 256 fd limit, ~250 kept-alive loggers -> "too many open files" (verified).
+TRANSFERABLE RULE: When N methods differ only by one value, write the body once and have each method pass its value -
+  a copy-pasted check is a bug waiting for one missed edit.
+RECALL CARD -> Q: Your Warn() and Error() checked DEBUG instead of their own level. What structural change makes that
+  mistake impossible rather than just fixed? A: One private write(level, msg) that filters/formats/writes; Debug/Info/Warn/
+  Error each just call it with their own level, so there is no per-method check left to get wrong.
+```
+
 | # | Date | Problem | Target gaps | Score | Verdict |
 |---|------|---------|-------------|-------|---------|
 | 1 | 2026-09-09 – 2026-09-10 | Thread-safe KV Store w/ TTL | G1, G15, G16, G12 | 50/100 (partial) | No Hire — assisted |
@@ -777,6 +841,9 @@ RECALL CARD -> Q: You fixed the recipe exploit by validating inside Recipe's con
 | 18 | 2026-09-28 | Logistics Management System — re-score after fixes | F1 (open), F2/F4 (his fixes); F3 descoped, F5 dropped per his instruction | 62/100 (Level-1 lens) | Not yet decent — 8 short, root cause of F1/F2 still open |
 | 19 | 2026-09-28 | Coffee Shop (self-built, no coaching phases) | requirements vs the obvious core (no written scope) | 53/100 (Level-1 lens) | Not yet decent — 17 short, API & errors under the floor |
 | 20 | 2026-09-28 | Coffee Shop — re-score after fixes | F1/F3 fixed; F2 descoped; F4/F5 left open | 72/100 (Level-1 lens) | **PASS — first Level-1 pass** |
+| 21 | 2026-09-29 | Task Management System (new problem, Level 1) | Phase 2 dim 1 = 4; Phase 3 skipped | 63/100 (Level-1 lens) | Not yet decent — 7 short, unflagged scope drift |
+| 21b | 2026-09-29 | Task Management System — re-score, F1 descoped on request | creator-only now accepted as intentional; F2/F3/F4 stand | 67/100 (Level-1 lens) | Not yet decent — 3 short |
+| 22 | 2026-10-15 | Logger (first Go problem, self-built) | Level-1 review; reference v2 delivered on request | 47/100 (Level-1 lens) | Not yet decent — Warn/Error dead at INFO+, API & errors under floor |
 | 16 | 2026-09-26 | Music Playlist Manager — re-score after fixes | F2/F4/part of F5 fixed by him | 62/100 (Level-1 lens) | Not yet decent — 8 short, no regressions |
 
 ---
@@ -866,6 +933,10 @@ _Flat-dimension watch (§10): dim 6 went 3, 8, 6, 5, 5, 7 — S6 fixes verified 
 | B35 | Guard bypass via public entity mutators (Logistics): `Shipment.assignVehicle/cancelShipment/deliverShipment` are public with no service in the way; `ShipmentService`'s checks (cancelled, already-assigned) and `VehicleAssignmentService.freeWeight` wiring only apply on the path through the service (2026-09-26/28 verified: direct calls skip both; a fake, never-registered `Vehicle` can be attached via direct `assignVehicle`, and two direct cancel/deliver calls each leaked vehicle capacity permanently, later starving a smaller shipment that should have fit). Same family as B32/B34. Status: open (S18: the capacity-release fix was added but only on the service path, root cause untouched). | open |
 | B37 | Unvalidated recipe -> unbounded inventory (Coffee Shop): `RecipeService.addRecipe` accepts any milk/coffee/sugar value with no check, and `Inventory.consume` does `total -= recipe.getX()`, so a negative ingredient amount adds to stock instead of subtracting it (2026-09-28 verified: a -1000-milk recipe took a 100-unit inventory to 1,100 after one prepare, 6,100 after five more). | open |
 | B37f | (closed, S20) RecipeService/Recipe fixed: validation moved into Recipe's constructor; verified exploit gone. | closed |
+| B39 | Assignee has no authority (Task Management): originally logged as an unflagged scope deviation (locked rule said creator OR assignee). Sahil said he misread the locked scope as creator-only and asked to accept that as the design, aware an assignee can never update their own task. | descoped by request 2026-09-29, not a bug |
+| B40 | Locked field missing (Task Management): the due date field from the locked scope does not exist anywhere on `Task` (2026-09-29 verified by reading the full entity). Unflagged deviation. | open |
+| B41 | Set.of().contains(null) NPE (Task Management): `Task.<init>` checks `assignees.contains(null)` to reject a null element; Java's immutable-collection factories (`Set.of()`, `List.of()`) throw `NullPointerException` on a null ARGUMENT to `contains()` regardless of the collection's actual contents, so a perfectly valid `Set.of()` crashes construction while `Collections.emptySet()`/`HashSet` do not (2026-09-29 verified both ways). | open |
+| B42 | Sibling validation gap (Task Management): `Task`'s constructor validates every field; `User`'s constructor validates nothing (null id, blank name, null email all accepted) — same codebase, same session, the Coffee Shop lesson (validate at the entity's own constructor) applied to one sibling and not the other. Failure surfaces later as an unrelated NPE inside `UserService.addUser`'s `.toLowerCase()` (2026-09-29 verified). | open |
 | B38 | Wrong structure + surprising equals (Coffee Shop): `RecipeService` uses `HashSet<Recipe>` with `Recipe.equals()/hashCode()` keyed only on `coffeeType` instead of `Map<CoffeeType,Recipe>`, forcing `getRecipe` into an O(n) `stream().filter()` scan and making two recipes with entirely different ingredients compare equal (2026-09-28 verified: `cheap.equals(fancy) == true` for differently-provisioned Latte recipes). | closed (S20: Map<CoffeeType,Recipe>, equals/hashCode removed from Recipe entirely, verified O(1) - 2M lookups in 7ms) |
 | B36 | Aggregate-only validation (Logistics): `ShipmentService.createShipment` rejects a non-positive TOTAL weight/cost but not an individual package's negative weight or quantity, so a physically invalid package is accepted whenever a later package's magnitude makes the sum positive (2026-09-28 verified: -100 + 200 -> totalWeight 100.0). | open |
 | B29 | State without a clock (Meeting Room): `BookingService.completeBooking` moves a BOOKED booking to COMPLETED by hand; COMPLETED bookings leave the `booked` TreeSet that `hasOverlap` reads, so completing a FUTURE booking lets another employee book the same slot (2026-09-24 verified). Same family as card 9. | open |
@@ -932,4 +1003,6 @@ _(one added per session; ★ = failed on re-test at least once)_
 | 18 | You added freeWeight and wired it into ShipmentService.cancelShipment/deliverShipment. Does that close the S17 finding that Shipment's mutators are public? | No — calling shipment.cancelShipment() directly still skips freeWeight entirely; the leak is fixed only on the one path you tested, not at its root (the public mutator itself). | |
 | 19 | Inventory.addMilk rejects a negative amount; RecipeService.addRecipe does not check milk/coffee/sugar at all. What is the concrete consequence, and what's the general lesson? | consume() does total -= recipe.getX(), so a negative recipe amount adds to inventory instead of subtracting - preparing that coffee manufactures ingredients unbounded. Validate every value at its entry point, not only the ones on a path already labeled "risky". | |
 | 20 | You fixed the recipe exploit by validating inside Recipe's constructor rather than adding a check to RecipeService.addRecipe. Why does that placement matter? | A constructor check protects every path that ever creates a Recipe, present or future; a check in one service only protects callers that go through that exact method. | |
+| 21 | The locked scope said "creator or assignee may change status." Main.java's own section header says "Only the creator can modify a task," and Bob (the assignee) gets UnauthorizedTaskModificationException for marking his own task IN_PROGRESS. What does this tell you to do before handing work back for a score? | Diff what you built against what was locked, one line at a time, and call out every place they disagree — whether your version is better or you just changed it without noticing — rather than assert what the scope was from memory. | |
+| 22 | Your Go logger's Warn() and Error() checked DEBUG instead of their own level. What structural change makes that mistake impossible, not just fixed? | One private write(level, msg) that filters, formats and writes; Debug/Info/Warn/Error each just call it with their own level, so there is no per-method check left to get wrong. | |
 | 16 | You made PlaylistService validate ids. What else must you check before calling the fix done? | Every other route to the same state — the Playlist objects it returns still have public mutators; hand out snapshots or keep the mutators reachable only from the service. | |
